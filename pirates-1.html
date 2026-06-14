@@ -201,10 +201,11 @@
     <path fill="#0d2440aa" d="M0,90 C300,50 500,130 800,90 C1000,60 1100,110 1200,90 L1200,200 L0,200 Z"/>
     <path fill="#0a1a2e" d="M0,120 C200,90 500,150 800,120 C1000,100 1100,140 1200,120 L1200,200 L0,200 Z"/>
   </svg>
-  <div class="title-ship">⛵</div>
+  <div class="title-ship" id="titleShipCanvas">🏴‍☠️</div>
   <h1 class="title-main">PIRATES!</h1>
   <p class="title-sub">THE CARIBBEAN ADVENTURE</p>
   <p class="title-author">Inspiriert von Sid Meier's Pirates! (MicroProse, 1987)</p>
+  <p class="title-author" style="color:var(--gold);margin-top:6px;font-style:normal;letter-spacing:.1em;">♦ Zum Leben erweckt von Oliver Brockhoff ♦</p>
   <button class="btn-primary" onclick="showCharCreation()">⚓ Stich in See!</button>
 </div>
 
@@ -368,13 +369,21 @@
 </div>
 
 <!-- ══ BATTLE SCREEN ══ -->
-<div id="battleScreen" class="screen">
-  <canvas id="battleCanvas"></canvas>
-  <div class="battle-hud">
-    <button class="battle-btn" onclick="battleAction('broadside')">💥 Breitseite</button>
-    <button class="battle-btn" onclick="battleAction('turn')">↩️ Wenden</button>
-    <button class="battle-btn" onclick="battleAction('board')">⚔️ Entern</button>
-    <button class="battle-btn" onclick="battleAction('flee')">🌬️ Fliehen</button>
+<div id="battleScreen" class="screen" style="background:#0a1a30;padding:0;justify-content:flex-start;">
+  <canvas id="battleCanvas" style="display:block;width:100%;"></canvas>
+  <!-- Mobile touch controls -->
+  <div id="battleControls" style="position:fixed;bottom:0;left:0;right:0;background:#05101aee;border-top:1px solid #2a5a8c;display:flex;flex-direction:column;gap:4px;padding:6px;">
+    <div style="display:flex;gap:6px;justify-content:center;">
+      <button class="battle-btn" id="btnLeft"  ontouchstart="bKeys.left=true"  ontouchend="bKeys.left=false"  onmousedown="bKeys.left=true"  onmouseup="bKeys.left=false">◀ Links</button>
+      <button class="battle-btn" id="btnRight" ontouchstart="bKeys.right=true" ontouchend="bKeys.right=false" onmousedown="bKeys.right=true" onmouseup="bKeys.right=false">Rechts ▶</button>
+      <button class="battle-btn" style="background:#3a0808;border-color:#8b1a1a;" ontouchstart="fireCannon()" onmousedown="fireCannon()">💥 FEUER!</button>
+      <button class="battle-btn" onclick="battleFlee()">🌬 Fliehen</button>
+    </div>
+    <div style="display:flex;gap:6px;justify-content:center;">
+      <button class="battle-btn" ontouchstart="bKeys.up=true" ontouchend="bKeys.up=false" onmousedown="bKeys.up=true" onmouseup="bKeys.up=false">▲ Voraus</button>
+      <button class="battle-btn" ontouchstart="bKeys.down=true" ontouchend="bKeys.down=false" onmousedown="bKeys.down=true" onmouseup="bKeys.down=false">▼ Zurück</button>
+      <button class="battle-btn" onclick="tryBoard()">⚔️ Entern</button>
+    </div>
   </div>
 </div>
 
@@ -1085,151 +1094,447 @@ function donateChurch(){
 }
 
 // ════════════════════════════════════════════════════════════
-//  BATTLE
+//  ACTIVE SEA BATTLE — C64 Style
 // ════════════════════════════════════════════════════════════
 let battleCtx, battleCvs, battleAnim;
+const bKeys={up:false,down:false,left:false,right:false};
+let cannonballs=[], splashes=[], battleWind={angle:30,speed:1.2};
+let bW,bH, reloadTimer=0, enemyReloadTimer=0, battleOver=false;
+
+// Player & enemy ship state (in battle coords)
+let pShip={x:0,y:0,angle:0,speed:0,hull:100};
+let eShip={x:0,y:0,angle:0,speed:1.2,hull:100};
 
 function startBattle(enemy){
   G.currentEnemy=enemy;
-  G.playerHull=G.hull;
-  G.enemyHull=100;
-  G.battlePhase='approach';
+  battleOver=false;
+  cannonballs=[]; splashes=[];
+  reloadTimer=0; enemyReloadTimer=60;
 
   battleCvs=document.getElementById('battleCanvas');
-  const w=window.innerWidth, h=window.innerHeight-80;
-  battleCvs.width=w; battleCvs.height=h;
+  bW=window.innerWidth;
+  bH=Math.max(window.innerHeight-130,300);
+  battleCvs.width=bW; battleCvs.height=bH;
+  battleCvs.style.height=bH+'px';
   battleCtx=battleCvs.getContext('2d');
 
-  // init ship positions
-  G.playerShipX=150; G.playerShipY=h/2;
-  G.enemyShipX=w-150; G.enemyShipY=h/2;
-  G.playerShipAngle=0; G.enemyShipAngle=Math.PI;
+  battleWind.angle=Math.random()*360;
+  battleWind.speed=0.8+Math.random()*1.2;
+
+  // starting positions
+  pShip={x:bW*0.2, y:bH/2, angle:0, speed:0, hull:G.hull};
+  eShip={x:bW*0.8, y:bH/2, angle:Math.PI, speed:1.5, hull:100};
+
+  // keyboard
+  const bKeyDown=e=>{
+    if(e.key==='ArrowLeft')  bKeys.left=true;
+    if(e.key==='ArrowRight') bKeys.right=true;
+    if(e.key==='ArrowUp')    bKeys.up=true;
+    if(e.key==='ArrowDown')  bKeys.down=true;
+    if(e.key===' ')          fireCannon();
+  };
+  const bKeyUp=e=>{
+    if(e.key==='ArrowLeft')  bKeys.left=false;
+    if(e.key==='ArrowRight') bKeys.right=false;
+    if(e.key==='ArrowUp')    bKeys.up=false;
+    if(e.key==='ArrowDown')  bKeys.down=false;
+  };
+  document.addEventListener('keydown',bKeyDown);
+  document.addEventListener('keyup',bKeyUp);
+  battleCvs._bKeyDown=bKeyDown; battleCvs._bKeyUp=bKeyUp;
 
   showScreen('battleScreen');
   if(battleAnim) cancelAnimationFrame(battleAnim);
-  battleLoop();
+  battleAnim=requestAnimationFrame(battleTick);
 
   showOverlay(
-    `⚔️ Begegnung auf See!`,
-    `<strong>${enemy.name}</strong> (${enemy.nation}) — ${enemy.cannons} Kanonen<br><br>
-    Das feindliche Schiff nähert sich! Bereitet euch auf den Kampf vor!`,
-    [{label:'Zum Kampf!',action:hideOverlay}]
+    `⚔️ ${enemy.name} greift an!`,
+    `<strong>${enemy.nation}</strong> — ${enemy.cannons} Kanonen<br><br>
+    🎮 <strong>Steuerung:</strong><br>
+    ▲▼ = Vorwärts/Rückwärts<br>
+    ◀▶ = Wenden<br>
+    LEERTASTE / 💥 = Kanonen!<br><br>
+    <em>Kommt in Reichweite und feuert beide Breitseiten!</em>`,
+    [{label:'Zum Kampf! ⚓',action:hideOverlay}]
   );
 }
 
-function battleLoop(){
+function fireCannon(){
+  if(battleOver||reloadTimer>0) return;
+  reloadTimer=45; // frames reload time
+  // fire both port & starboard broadsides
+  for(const side of[-1,1]){
+    const sideAngle=pShip.angle + side*Math.PI/2;
+    for(let i=0;i<Math.min(3,Math.floor(G.cannons/2));i++){
+      const spread=(i-1)*0.15;
+      cannonballs.push({
+        x:pShip.x+Math.cos(sideAngle)*20,
+        y:pShip.y+Math.sin(sideAngle)*20,
+        vx:Math.cos(sideAngle+spread)*7,
+        vy:Math.sin(sideAngle+spread)*7,
+        life:60, owner:'player', r:5
+      });
+    }
+  }
+}
+
+function enemyFire(){
+  if(enemyReloadTimer>0||battleOver) return;
+  enemyReloadTimer=90;
+  const dx=pShip.x-eShip.x, dy=pShip.y-eShip.y;
+  const aimAngle=Math.atan2(dy,dx);
+  const accuracy=0.35;
+  for(let i=0;i<Math.min(2,Math.floor((G.currentEnemy?.cannons||8)/3));i++){
+    const spread=(Math.random()-0.5)*accuracy;
+    cannonballs.push({
+      x:eShip.x+Math.cos(aimAngle)*20,
+      y:eShip.y+Math.sin(aimAngle)*20,
+      vx:Math.cos(aimAngle+spread)*5.5,
+      vy:Math.sin(aimAngle+spread)*5.5,
+      life:70, owner:'enemy', r:4
+    });
+  }
+}
+
+function battleTick(){
   if(!document.getElementById('battleScreen').classList.contains('active')) return;
+  updateBattle();
   drawBattle();
-  battleAnim=requestAnimationFrame(battleLoop);
+  battleAnim=requestAnimationFrame(battleTick);
+}
+
+function updateBattle(){
+  if(battleOver) return;
+
+  // player turning
+  const turnSpeed=0.045;
+  if(bKeys.left)  pShip.angle-=turnSpeed;
+  if(bKeys.right) pShip.angle+=turnSpeed;
+
+  // wind-affected speed
+  const windEffect=Math.cos(pShip.angle - battleWind.angle*Math.PI/180)*battleWind.speed*0.4;
+  if(bKeys.up)   pShip.speed=Math.min(4, pShip.speed+0.12+windEffect*0.05);
+  if(bKeys.down) pShip.speed=Math.max(0, pShip.speed-0.18);
+  pShip.speed=Math.max(0, pShip.speed*0.97); // drag
+
+  pShip.x+=Math.cos(pShip.angle)*pShip.speed;
+  pShip.y+=Math.sin(pShip.angle)*pShip.speed;
+  // bounce off edges
+  if(pShip.x<30){pShip.x=30;pShip.speed*=0.5;}
+  if(pShip.x>bW-30){pShip.x=bW-30;pShip.speed*=0.5;}
+  if(pShip.y<30){pShip.y=30;pShip.speed*=0.5;}
+  if(pShip.y>bH-30){pShip.y=bH-30;pShip.speed*=0.5;}
+
+  // enemy AI: circle the player
+  const dx=pShip.x-eShip.x, dy=pShip.y-eShip.y;
+  const dist=Math.hypot(dx,dy);
+  const desiredAngle=Math.atan2(dy,dx);
+  let aDiff=desiredAngle-eShip.angle;
+  while(aDiff>Math.PI) aDiff-=Math.PI*2;
+  while(aDiff<-Math.PI) aDiff+=Math.PI*2;
+  // keep at broadside range (150-250px)
+  if(dist<160) eShip.angle+=Math.sign(aDiff)*0.04+0.04;
+  else if(dist>260) eShip.angle+=Math.sign(aDiff)*0.04;
+  else eShip.angle+=0.035; // circle
+  eShip.speed=1.5+(dist>300?0.5:0);
+  eShip.x+=Math.cos(eShip.angle)*eShip.speed;
+  eShip.y+=Math.sin(eShip.angle)*eShip.speed;
+  eShip.x=Math.max(30,Math.min(bW-30,eShip.x));
+  eShip.y=Math.max(30,Math.min(bH-30,eShip.y));
+
+  // timers
+  if(reloadTimer>0) reloadTimer--;
+  if(enemyReloadTimer>0) enemyReloadTimer--;
+  else { if(dist<280) enemyFire(); }
+
+  // cannonballs
+  for(let i=cannonballs.length-1;i>=0;i--){
+    const b=cannonballs[i];
+    b.x+=b.vx; b.y+=b.vy; b.life--;
+    if(b.life<=0||b.x<0||b.x>bW||b.y<0||b.y>bH){
+      if(b.life<=0) splashes.push({x:b.x,y:b.y,r:0,max:18,life:20});
+      cannonballs.splice(i,1); continue;
+    }
+    // hit detection
+    if(b.owner==='player'){
+      if(Math.hypot(b.x-eShip.x,b.y-eShip.y)<28){
+        const dmg=4+Math.floor(Math.random()*6);
+        eShip.hull=Math.max(0,eShip.hull-dmg);
+        splashes.push({x:b.x,y:b.y,r:0,max:22,life:25,hit:true});
+        cannonballs.splice(i,1);
+        if(eShip.hull<=0){ endBattle(true); return; }
+        continue;
+      }
+    } else {
+      if(Math.hypot(b.x-pShip.x,b.y-pShip.y)<28){
+        const dmg=3+Math.floor(Math.random()*5);
+        pShip.hull=Math.max(0,pShip.hull-dmg);
+        G.hull=pShip.hull;
+        splashes.push({x:b.x,y:b.y,r:0,max:22,life:25,hit:true});
+        cannonballs.splice(i,1);
+        if(pShip.hull<=0){ endBattle(false); return; }
+        continue;
+      }
+    }
+  }
+  // splashes
+  for(let i=splashes.length-1;i>=0;i--){
+    const s=splashes[i];
+    s.r=Math.min(s.r+1.5,s.max); s.life--;
+    if(s.life<=0) splashes.splice(i,1);
+  }
+
+  // wind slowly changes
+  battleWind.angle+=(Math.random()-0.5)*0.3;
 }
 
 function drawBattle(){
-  const c=battleCtx;
-  const w=battleCvs.width, h=battleCvs.height;
+  const c=battleCtx; const w=bW, h=bH;
   c.clearRect(0,0,w,h);
 
   // sea
   const g=c.createLinearGradient(0,0,0,h);
-  g.addColorStop(0,'#1a3a5c');g.addColorStop(1,'#0a1a2e');
+  g.addColorStop(0,'#1e4a70');g.addColorStop(1,'#081525');
   c.fillStyle=g; c.fillRect(0,0,w,h);
 
   // waves
   const t=Date.now()*0.001;
-  c.strokeStyle='#ffffff18';c.lineWidth=1;
-  for(let y=0;y<h;y+=30){
+  c.strokeStyle='#ffffff14';c.lineWidth=1;
+  for(let y=0;y<h;y+=28){
     c.beginPath();
-    for(let x=0;x<w;x+=4){ const wy=y+Math.sin((x*0.05)+t)*6; x===0?c.moveTo(x,wy):c.lineTo(x,wy); }
+    for(let x=0;x<w;x+=5){
+      const wy=y+Math.sin((x*0.06)+t+y*0.02)*5;
+      x===0?c.moveTo(x,wy):c.lineTo(x,wy);
+    }
     c.stroke();
   }
 
-  // player ship
-  drawBattleShip(c,G.playerShipX,G.playerShipY,G.playerShipAngle,NATION_COLORS[G.nation]||'#f0c040',true);
+  // wind indicator
+  c.save();
+  c.fillStyle='#d4a01766'; c.font='11px Cinzel,serif'; c.textAlign='left';
+  c.fillText(`💨 Wind: ${Math.round(battleWind.speed*10)/10} kn`,10,18);
+  const wa=battleWind.angle*Math.PI/180;
+  c.strokeStyle='#d4a01799'; c.lineWidth=2;
+  c.beginPath(); c.moveTo(120,12); c.lineTo(120+Math.cos(wa)*16,12+Math.sin(wa)*16); c.stroke();
+  c.restore();
 
-  // enemy ship
-  drawBattleShip(c,G.enemyShipX,G.enemyShipY,G.enemyShipAngle,NATION_COLORS[G.currentEnemy?.nation]||'#cc0000',false);
+  // reload indicator
+  if(reloadTimer>0){
+    const pct=1-reloadTimer/45;
+    c.fillStyle='#0a1520'; c.fillRect(w/2-50,4,100,10);
+    c.fillStyle=pct>0.7?'#2ecc71':'#e74c3c';
+    c.fillRect(w/2-50,4,100*pct,10);
+    c.fillStyle='#fff'; c.font='8px Cinzel,serif'; c.textAlign='center';
+    c.fillText('NACHLADEN',w/2,13);
+  } else {
+    c.fillStyle='#2ecc7188'; c.font='9px Cinzel,serif'; c.textAlign='center';
+    c.fillText('● BEREIT ●',w/2,13);
+  }
+
+  // cannonballs
+  for(const b of cannonballs){
+    c.save();
+    const trail=4;
+    c.strokeStyle=b.owner==='player'?'#f0c04088':'#ff444488';
+    c.lineWidth=2;
+    c.beginPath();
+    c.moveTo(b.x-b.vx*trail,b.y-b.vy*trail);
+    c.lineTo(b.x,b.y);
+    c.stroke();
+    c.fillStyle=b.owner==='player'?'#f0c040':'#cc2222';
+    c.beginPath(); c.arc(b.x,b.y,b.r,0,Math.PI*2); c.fill();
+    c.restore();
+  }
+
+  // splashes
+  for(const s of splashes){
+    c.save();
+    const alpha=s.life/25;
+    c.strokeStyle=s.hit?`rgba(255,100,0,${alpha})`:`rgba(100,160,255,${alpha})`;
+    c.lineWidth=2;
+    c.beginPath(); c.arc(s.x,s.y,s.r,0,Math.PI*2); c.stroke();
+    if(s.hit){
+      c.fillStyle=`rgba(255,60,0,${alpha*0.4})`;
+      c.beginPath(); c.arc(s.x,s.y,s.r*0.5,0,Math.PI*2); c.fill();
+    }
+    c.restore();
+  }
+
+  // draw ships
+  drawPirateShip(c,pShip.x,pShip.y,pShip.angle,true);
+  drawPirateShip(c,eShip.x,eShip.y,eShip.angle,false);
 
   // HP bars
-  drawHPBar(c,60,h-40,200,G.playerHull,`${G.name}'s Schiff`,'#2ecc71');
-  drawHPBar(c,w-260,h-40,200,G.enemyHull,G.currentEnemy?.name||'Feind','#e74c3c');
+  const bw=Math.min(180,w*0.28);
+  drawBattleHP(c,10,h-28,bw,pShip.hull,G.name,'#2ecc71');
+  drawBattleHP(c,w-bw-10,h-28,bw,eShip.hull,G.currentEnemy?.name?.split(' ').slice(-1)[0]||'Feind','#e74c3c');
+
+  // distance indicator
+  const dist=Math.hypot(pShip.x-eShip.x,pShip.y-eShip.y);
+  const range=dist<200?'🔴 SCHUSSWEITE!':dist<350?'🟡 Nah':'⚪ Weit';
+  c.fillStyle='#ffffffaa'; c.font='11px Cinzel,serif'; c.textAlign='center';
+  c.fillText(range,w/2,h-14);
 }
 
-function drawBattleShip(c,x,y,angle,col,isPlayer){
+function drawPirateShip(c,x,y,angle,isPlayer){
   c.save(); c.translate(x,y); c.rotate(angle);
-  const size=isPlayer?1.4:1.2;
-  // hull
-  c.fillStyle=col; c.strokeStyle='#fff'; c.lineWidth=2;
-  c.beginPath(); c.moveTo(35*size,0); c.lineTo(-25*size,15*size); c.lineTo(-18*size,0); c.lineTo(-25*size,-15*size); c.closePath();
+  const s=isPlayer?1.3:1.1;
+
+  // hull shadow
+  c.fillStyle='rgba(0,0,0,0.3)';
+  c.beginPath(); c.ellipse(4*s,4*s,32*s,12*s,0,0,Math.PI*2); c.fill();
+
+  // main hull
+  c.fillStyle=isPlayer?'#5c3a1a':'#3a1a1a';
+  c.strokeStyle='#2a1a08'; c.lineWidth=1.5;
+  c.beginPath();
+  c.moveTo(38*s,0);
+  c.bezierCurveTo(30*s,-12*s,-20*s,-14*s,-28*s,-6*s);
+  c.lineTo(-28*s,6*s);
+  c.bezierCurveTo(-20*s,14*s,30*s,12*s,38*s,0);
   c.fill(); c.stroke();
-  // mast
-  c.strokeStyle='#8b6914'; c.lineWidth=3;
-  c.beginPath(); c.moveTo(5*size,-20*size); c.lineTo(5*size,0); c.stroke();
-  // sail
-  c.fillStyle='#ffffffcc';
-  c.beginPath(); c.moveTo(5*size,-18*size); c.bezierCurveTo(22*size,-10*size,22*size,10*size,5*size,2*size); c.closePath(); c.fill();
-  // cannons
-  c.fillStyle='#555'; c.strokeStyle='#333'; c.lineWidth=1;
-  for(let i=-1;i<=1;i+=2){ c.beginPath(); c.rect(-10*size,i*12*size,8*size,4*size); c.fill(); c.stroke(); }
+
+  // deck planks
+  c.strokeStyle='#3a2a12'; c.lineWidth=0.8;
+  for(let i=-2;i<=2;i++){
+    c.beginPath(); c.moveTo(-20*s,i*4*s); c.lineTo(30*s,i*4*s); c.stroke();
+  }
+
+  // waterline stripe
+  c.strokeStyle=isPlayer?'#f0c040':'#cc2222'; c.lineWidth=2;
+  c.beginPath();
+  c.moveTo(-28*s,0); c.bezierCurveTo(-20*s,8*s,20*s,8*s,35*s,0);
+  c.stroke();
+
+  // masts (2 masts)
+  // masts (2 masts)
+  c.strokeStyle='#6b4a14'; c.lineWidth=3;
+  // fore mast
+  c.beginPath(); c.moveTo(14*s,0); c.lineTo(14*s,-38*s*1.1); c.stroke();
+  // main mast
+  c.beginPath(); c.moveTo(-4*s,0); c.lineTo(-4*s,-44*s*1.1); c.stroke();
+
+  // sails
+  const sailColor=isPlayer?'#e8d8b0':'#c8a080';
+  const sailDark=isPlayer?'#c8b890':'#a88060';
+  // fore sail
+  c.fillStyle=sailColor;
+  c.beginPath();
+  c.moveTo(14*s,-34*s);
+  c.bezierCurveTo(30*s,-28*s,28*s,-14*s,14*s,-8*s);
+  c.bezierCurveTo(8*s,-14*s,8*s,-28*s,14*s,-34*s);
+  c.fill();
+  c.strokeStyle=sailDark; c.lineWidth=0.5;
+  // sail ribs
+  for(let i=1;i<4;i++){
+    c.beginPath();
+    c.moveTo(14*s,-34*s+i*7*s);
+    c.lineTo(14*s+14*s*0.8,-34*s+i*7*s);
+    c.stroke();
+  }
+  // main sail
+  c.fillStyle=sailColor;
+  c.beginPath();
+  c.moveTo(-4*s,-40*s);
+  c.bezierCurveTo(18*s,-34*s,18*s,-12*s,-4*s,-6*s);
+  c.bezierCurveTo(-18*s,-12*s,-18*s,-34*s,-4*s,-40*s);
+  c.fill();
+  for(let i=1;i<5;i++){
+    c.beginPath(); c.moveTo(-4*s,-40*s+i*8*s); c.lineTo(-4*s+18*s,-40*s+i*8*s); c.stroke();
+  }
+
+  // flag
+  if(isPlayer){
+    c.fillStyle='#000';
+    c.fillRect(-4*s-3,-44*s*1.1,14,9);
+    c.fillStyle='#fff'; c.font=`${7*s}px serif`; c.textAlign='center';
+    c.fillText('☠',-4*s+4,-44*s*1.1+8);
+  } else {
+    const col=NATION_COLORS[G.currentEnemy?.nation]||'#cc0000';
+    c.fillStyle=col;
+    c.fillRect(-4*s-3,-44*s*1.1,14,9);
+  }
+
+  // cannons (port & starboard)
+  c.fillStyle='#2a2a2a'; c.strokeStyle='#444'; c.lineWidth=1;
+  for(const side of[-1,1]){
+    for(let ci=0;ci<3;ci++){
+      const cx=(-10+ci*12)*s, cy=side*10*s;
+      c.save(); c.translate(cx,cy); c.rotate(side*Math.PI/2);
+      c.fillRect(-4,-2,12,4); c.strokeRect(-4,-2,12,4);
+      c.restore();
+    }
+  }
+
+  // speed wake
+  if(isPlayer && pShip.speed>0.5){
+    c.strokeStyle='rgba(255,255,255,0.15)'; c.lineWidth=pShip.speed*1.5;
+    c.beginPath(); c.moveTo(-28*s,0); c.lineTo(-28*s-pShip.speed*18,0); c.stroke();
+    c.beginPath(); c.moveTo(-24*s,-4*s); c.lineTo(-24*s-pShip.speed*12,-4*s-3); c.stroke();
+    c.beginPath(); c.moveTo(-24*s,4*s);  c.lineTo(-24*s-pShip.speed*12,4*s+3);  c.stroke();
+  }
+
   c.restore();
 }
 
-function drawHPBar(c,x,y,w,hp,label,col){
-  c.fillStyle='#0a1520'; c.strokeStyle='#2a5a8c'; c.lineWidth=1;
-  c.fillRect(x,y,w,14); c.strokeRect(x,y,w,14);
-  c.fillStyle=col; c.fillRect(x+1,y+1,(w-2)*hp/100,12);
-  c.fillStyle='#fff'; c.font='10px Cinzel,serif'; c.textAlign='center';
-  c.fillText(`${label} — ${Math.round(hp)}%`,x+w/2,y-4);
+function drawBattleHP(c,x,y,w,hp,label,col){
+  c.fillStyle='#050f1a'; c.fillRect(x,y,w,12);
+  c.fillStyle=col; c.fillRect(x,y,w*Math.max(0,hp)/100,12);
+  c.strokeStyle='#2a5a8c'; c.lineWidth=1; c.strokeRect(x,y,w,12);
+  c.fillStyle='#ffffffcc'; c.font='9px Cinzel,serif'; c.textAlign='center';
+  c.fillText(`${label} ${Math.round(Math.max(0,hp))}%`,x+w/2,y-3);
 }
 
-function battleAction(action){
-  if(!G.currentEnemy||G.enemyHull<=0||G.playerHull<=0) return;
-  const e=G.currentEnemy;
-  let msg='';
-
-  if(action==='broadside'){
-    const dmg=Math.floor(Math.random()*G.cannons*3+10);
-    const edm=Math.floor(Math.random()*e.cannons*2+5);
-    G.enemyHull=Math.max(0,G.enemyHull-dmg);
-    G.playerHull=Math.max(0,G.playerHull-edm);
-    G.hull=G.playerHull;
-    msg=`💥 Breitseite! Du triffst für ${dmg} Schaden. Der Feind erwidert mit ${edm}.`;
-    if(G.enemyHull<=0){
-      cancelAnimationFrame(battleAnim);
-      const gold=e.gold+Math.floor(Math.random()*300);
-      G.gold+=gold; G.plunder+=gold; G.score+=gold;
-      G.cargo=Math.min(G.maxCargo,G.cargo+e.cargo);
-      e.hull=0; updateStatusBar();
-      showOverlay('🏆 Sieg!',`"${e.name}" ist gesunken!<br><br>Du erbeutest:<br>• ${gold} Gold<br>• ${e.cargo} Tonnen Waren<br><br>Deine Männer jubeln!`,[{label:'Heja!',action:()=>{showScreen('worldScreen');mapLoop();}}]);
-      return;
-    }
-    if(G.playerHull<=0){
-      cancelAnimationFrame(battleAnim);
-      G.hull=10; G.crew=Math.max(5,Math.floor(G.crew*0.6));
-      showOverlay('💀 Niederlage!',`Dein Schiff ist schwer beschädigt und du musst fliehen!<br><br>Dein Schiff zieht sich beschämt zurück. ${Math.floor(G.crew*0.4)} Männer gehen verloren.`,[{label:'Rückzug!',action:()=>{G.playerHull=30;showScreen('worldScreen');mapLoop();}}]);
-      return;
-    }
-  } else if(action==='turn'){
-    G.playerShipAngle+=Math.PI*0.25;
-    const edm=Math.floor(Math.random()*5);
-    G.playerHull=Math.max(0,G.playerHull-edm);
-    G.hull=G.playerHull;
-    msg=`↩️ Du wendest das Schiff in den Wind. Leichte Beschädigungen: ${edm}`;
-  } else if(action==='board'){
-    if(Math.abs(G.enemyShipX-G.playerShipX)>200){
-      msg='⛵ Noch zu weit entfernt zum Entern! Nähert euch zuerst.';
-    } else {
-      cancelAnimationFrame(battleAnim);
-      startDuel();
-      return;
-    }
-  } else if(action==='flee'){
-    cancelAnimationFrame(battleAnim);
-    G.x+=30; G.y-=20;
-    showScreen('worldScreen'); mapLoop();
-    showOverlay('Entkommen!',`Ihr entkieht der Gefahr und entkommt! Deine Männer sind erleichtert.`,[{label:'Puh!',action:null}]);
+function tryBoard(){
+  const dist=Math.hypot(pShip.x-eShip.x,pShip.y-eShip.y);
+  if(dist>160){
+    showOverlay('Zu weit!','Ihr müsst näher heran! Kommt auf unter 160 Meter.',[{label:'Verstanden!',action:hideOverlay}]);
     return;
   }
-  showOverlay('⚔️ Kampf',`${msg}<br><br>Feind-Rumpf: ${Math.round(G.enemyHull)}% | Euer Rumpf: ${Math.round(G.playerHull)}%`,[{label:'Weiter kämpfen!',action:hideOverlay}]);
+  cancelAnimationFrame(battleAnim);
+  startDuel();
 }
+function battleFlee(){
+  cancelAnimationFrame(battleAnim);
+  document.removeEventListener('keydown',battleCvs._bKeyDown);
+  document.removeEventListener('keyup',battleCvs._bKeyUp);
+  G.x+=Math.random()*30-15; G.y+=Math.random()*30-15;
+  showScreen('worldScreen'); mapLoop();
+  showOverlay('Entkommen!','Ihr dreht bei und entkieht dem Feind unter dem Schutz des Windes!',[{label:'Puh!',action:null}]);
+}
+
+function endBattle(playerWon){
+  if(battleOver) return;
+  battleOver=true;
+  cancelAnimationFrame(battleAnim);
+  document.removeEventListener('keydown',battleCvs._bKeyDown);
+  document.removeEventListener('keyup',battleCvs._bKeyUp);
+  const e=G.currentEnemy;
+  if(playerWon){
+    const gold=e.gold+Math.floor(Math.random()*300);
+    G.gold+=gold; G.plunder+=gold; G.score+=gold;
+    G.cargo=Math.min(G.maxCargo,G.cargo+e.cargo);
+    e.hull=0; updateStatusBar();
+    showOverlay('🏆 Sieg!',
+      `"${e.name}" brennt und sinkt!<br><br>
+      ⚓ Beute:<br>• ${gold} Gold<br>• ${e.cargo} Tonnen Waren<br><br>
+      Deine Männer jubeln: <em>"Heja Kapitän ${G.name}!"</em>`,
+      [{label:'Heja! ⚓',action:()=>{G.hull=pShip.hull;showScreen('worldScreen');mapLoop();}}]
+    );
+  } else {
+    G.hull=Math.max(5,Math.floor(pShip.hull));
+    G.crew=Math.max(5,Math.floor(G.crew*0.65));
+    updateStatusBar();
+    showOverlay('💀 Niederlage!',
+      `Dein Schiff ist kampfunfähig! Die Crew rettet sich in die Boote.<br><br>
+      Du verlierst ${Math.floor(G.crew*0.35)} Männer und musst fliehen...`,
+      [{label:'Rückzug!',action:()=>{showScreen('worldScreen');mapLoop();}}]
+    );
+  }
+}
+
+// keep old battleAction for any remaining references
+function battleAction(action){ if(action==='flee') battleFlee(); }
 
 // ════════════════════════════════════════════════════════════
 //  DUEL
