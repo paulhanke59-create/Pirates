@@ -36,8 +36,9 @@
   }
 
   /* ── SCREENS ── */
-  .screen { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; }
-  .screen.active { display: flex; }
+  .screen { position:fixed; top:0; left:0; right:0; bottom:0; display:none; flex-direction:column; align-items:center; justify-content:center; }
+  .screen.active { display:flex; }
+  #worldScreen.active { top:36px; flex-direction:row; align-items:stretch; padding:0; justify-content:flex-start; }
 
   /* ── TITLE SCREEN ── */
   #titleScreen {
@@ -79,8 +80,16 @@
 
   /* ── WORLD MAP ── */
   #worldScreen { flex-direction:row; align-items:stretch; padding:0; }
-  #mapCanvas { flex:1; cursor:crosshair; }
-  #mapPanel { width:220px; background:#0a1520; border-left:2px solid var(--ui-border); display:flex; flex-direction:column; padding:12px; gap:8px; overflow-y:auto; }
+  #mapCanvas { flex:1; cursor:crosshair; display:block; }
+  #mapPanel { width:220px; min-width:220px; background:#0a1520; border-left:2px solid var(--ui-border); display:flex; flex-direction:column; padding:12px; gap:8px; overflow-y:auto; }
+  #mobileBar { display:none; }
+
+  @media (max-width:640px) {
+    #worldScreen { flex-direction:column; }
+    #mapPanel { display:none !important; }
+    #mobileBar { display:flex !important; position:fixed; bottom:0; left:0; right:0; background:#050f1a; border-top:1px solid #2a5a8c; padding:6px 8px; z-index:20; gap:6px; }
+    #mapCanvas { width:100vw !important; }
+  }
   .panel-title { font-family:'Cinzel',serif; font-size:13px; color:var(--gold); border-bottom:1px solid var(--ui-border); padding-bottom:6px; letter-spacing:.1em; }
   .stat-row { display:flex; justify-content:space-between; font-size:12px; }
   .stat-label { color:var(--sand); }
@@ -136,7 +145,12 @@
   .overlay-btn.secondary { background:#0d1f35; }
 
   /* ── STATUS BAR ── */
-  #statusBar { position:fixed; top:0; left:0; right:0; height:36px; background:#050f1a; border-bottom:1px solid var(--ui-border); display:flex; align-items:center; padding:0 12px; gap:16px; z-index:50; font-size:12px; font-family:'Share Tech Mono',monospace; }
+  #statusBar { position:fixed; top:0; left:0; right:0; height:36px; background:#050f1a; border-bottom:1px solid var(--ui-border); display:flex; align-items:center; padding:0 12px; gap:16px; z-index:50; font-size:12px; font-family:'Share Tech Mono',monospace; overflow:hidden; }
+
+  @media (max-width:640px) {
+    #statusBar { gap:8px; padding:0 6px; font-size:10px; }
+    .status-sep { display:none; }
+  }
   .status-item { color:var(--sand); }
   .status-val { color:var(--gold2); }
   .status-sep { color:var(--ui-border); }
@@ -273,7 +287,7 @@
 
 <!-- ══ WORLD MAP ══ -->
 <div id="worldScreen" class="screen">
-  <canvas id="mapCanvas" style="margin-top:36px;"></canvas>
+  <canvas id="mapCanvas"></canvas>
   <div id="mapPanel">
     <div class="panel-title">⚓ DEIN SCHIFF</div>
     <div class="stat-row"><span class="stat-label">Typ</span><span class="stat-val" id="pShipType">Sloop</span></div>
@@ -593,38 +607,32 @@ function canvasToWorld(cx,cy){ return {x:(cx-mapOffX)/mapScale, y:(cy-mapOffY)/m
 
 function initWorldMap(){
   mapCanvas=document.getElementById('mapCanvas');
+
+  // Let CSS handle panel visibility. Measure actual available size.
   const panel=document.getElementById('mapPanel');
-  // On mobile the panel may be hidden or overlapping — use full width on narrow screens
-  const isMobile=window.innerWidth<600;
-  if(isMobile){
-    document.getElementById('mapPanel').style.display='none';
-    document.getElementById('mobileBar').style.display='flex';
-    mapW=window.innerWidth;
-  } else {
-    document.getElementById('mapPanel').style.display='flex';
-    document.getElementById('mobileBar').style.display='none';
-    mapW=window.innerWidth-panel.offsetWidth;
-  }
-  mapH=window.innerHeight-36; // minus status bar
+  const panelW=(window.innerWidth>640)?220:0;
+  mapW=window.innerWidth-panelW;
+  mapH=window.innerHeight-36;
+
   mapCanvas.width=mapW;
   mapCanvas.height=mapH;
   mapCtx=mapCanvas.getContext('2d');
 
-  // Scale world to fit canvas with padding
+  // Scale world to fit canvas
   const sx=mapW/WORLD_W, sy=mapH/WORLD_H;
-  mapScale=Math.min(sx,sy)*0.95;
+  mapScale=Math.min(sx,sy)*0.94;
   mapOffX=(mapW-WORLD_W*mapScale)/2;
   mapOffY=(mapH-WORLD_H*mapScale)/2;
 
-  // Start at Port Royal in world coords
+  // Start at Port Royal
   if(G.x===650){ G.x=CITIES[0].wx; G.y=CITIES[0].wy; }
 
   spawnEnemyShips();
 
-  // Remove old listeners cleanly
-  const nc=mapCanvas.cloneNode(true);
+  // Replace canvas node to clear old listeners
+  const nc=mapCanvas.cloneNode(false);
   mapCanvas.parentNode.replaceChild(nc,mapCanvas);
-  mapCanvas=nc;
+  mapCanvas=nc; mapCanvas.width=mapW; mapCanvas.height=mapH;
   mapCtx=mapCanvas.getContext('2d');
 
   mapCanvas.addEventListener('click',onMapClick);
