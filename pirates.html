@@ -1,0 +1,1344 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pirates! — A Sid Meier Classic Remake</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=IM+Fell+English:ital@0;1&family=Share+Tech+Mono&display=swap');
+
+  :root {
+    --ocean:    #1a3a5c;
+    --ocean2:   #0d2440;
+    --sand:     #c8a96e;
+    --sand2:    #e8c98a;
+    --parch:    #f2e8c8;
+    --ink:      #1a1008;
+    --blood:    #8b1a1a;
+    --gold:     #d4a017;
+    --gold2:    #f0c040;
+    --green:    #2d5a27;
+    --green2:   #4a8f3f;
+    --ui-bg:    #0a1a2e;
+    --ui-border:#2a5a8c;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--ocean2);
+    font-family: 'IM Fell English', serif;
+    color: var(--parch);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    user-select: none;
+  }
+
+  /* ── SCREENS ── */
+  .screen { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; }
+  .screen.active { display: flex; }
+
+  /* ── TITLE SCREEN ── */
+  #titleScreen {
+    background: radial-gradient(ellipse at 50% 30%, #1a3a5c 0%, #0a1a2e 70%);
+    overflow: hidden;
+  }
+  .title-waves { position:absolute; bottom:0; left:0; right:0; height:200px; }
+  .title-ship { position:absolute; bottom:120px; left:50%; transform:translateX(-50%); font-size:80px; animation: bobShip 3s ease-in-out infinite; }
+  @keyframes bobShip { 0%,100%{transform:translateX(-50%) translateY(0) rotate(-2deg)} 50%{transform:translateX(-50%) translateY(-12px) rotate(2deg)} }
+  .title-stars { position:absolute; top:0; left:0; right:0; height:60%; }
+  .star { position:absolute; background:#fff; border-radius:50%; animation: twinkle 2s ease-in-out infinite; }
+  @keyframes twinkle { 0%,100%{opacity:1} 50%{opacity:.2} }
+  .title-main { font-family:'Cinzel',serif; font-size:clamp(48px,8vw,96px); font-weight:900; color:var(--gold2); text-shadow:0 0 40px #d4a01788,0 4px 8px #000a; letter-spacing:0.1em; position:relative; z-index:2; }
+  .title-sub { font-family:'Cinzel',serif; font-size:clamp(14px,2vw,22px); color:var(--sand2); letter-spacing:0.3em; margin-top:8px; position:relative; z-index:2; }
+  .title-author { color:var(--sand); font-style:italic; margin-top:4px; font-size:14px; position:relative; z-index:2; }
+  .btn-primary { font-family:'Cinzel',serif; font-size:18px; padding:14px 40px; background:linear-gradient(135deg,#8b1a1a,#c0392b); border:2px solid var(--gold); color:var(--gold2); cursor:pointer; border-radius:4px; margin-top:30px; letter-spacing:0.1em; transition:all .2s; position:relative; z-index:2; }
+  .btn-primary:hover { background:linear-gradient(135deg,#c0392b,#e74c3c); transform:scale(1.05); box-shadow:0 0 20px #d4a01766; }
+
+  /* ── CHARACTER CREATION ── */
+  #charScreen { background: radial-gradient(ellipse, #1a1008 0%, #0a0804 100%); gap:20px; padding:30px; }
+  .char-title { font-family:'Cinzel',serif; font-size:32px; color:var(--gold2); text-align:center; margin-bottom:10px; }
+  .era-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; width:100%; max-width:600px; }
+  .era-card { border:1px solid var(--ui-border); background:#0d1f35; padding:14px; cursor:pointer; border-radius:4px; transition:all .2s; }
+  .era-card:hover, .era-card.selected { border-color:var(--gold); background:#152840; }
+  .era-card h3 { font-family:'Cinzel',serif; color:var(--gold); font-size:14px; }
+  .era-card p { font-size:12px; color:var(--sand); margin-top:4px; font-style:italic; }
+  .nation-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; width:100%; max-width:600px; }
+  .nation-btn { border:1px solid var(--ui-border); background:#0d1f35; padding:10px; cursor:pointer; border-radius:4px; text-align:center; transition:all .2s; font-size:13px; }
+  .nation-btn:hover, .nation-btn.selected { border-color:var(--gold); background:#152840; }
+  .nation-flag { font-size:24px; display:block; margin-bottom:4px; }
+  .skill-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; width:100%; max-width:600px; }
+  .skill-btn { border:1px solid var(--ui-border); background:#0d1f35; padding:12px; cursor:pointer; border-radius:4px; transition:all .2s; }
+  .skill-btn:hover, .skill-btn.selected { border-color:var(--gold); background:#152840; }
+  .skill-btn h4 { font-family:'Cinzel',serif; color:var(--gold); font-size:13px; }
+  .skill-btn p { font-size:11px; color:var(--sand); margin-top:3px; }
+  .step-label { font-family:'Cinzel',serif; color:var(--sand2); font-size:14px; letter-spacing:.2em; }
+  .char-input { background:#0d1f35; border:1px solid var(--ui-border); color:var(--parch); font-family:'IM Fell English',serif; font-size:18px; padding:10px 16px; width:100%; max-width:300px; border-radius:4px; text-align:center; }
+  .char-input:focus { outline:none; border-color:var(--gold); }
+
+  /* ── WORLD MAP ── */
+  #worldScreen { flex-direction:row; align-items:stretch; padding:0; }
+  #mapCanvas { flex:1; cursor:crosshair; }
+  #mapPanel { width:220px; background:#0a1520; border-left:2px solid var(--ui-border); display:flex; flex-direction:column; padding:12px; gap:8px; overflow-y:auto; }
+  .panel-title { font-family:'Cinzel',serif; font-size:13px; color:var(--gold); border-bottom:1px solid var(--ui-border); padding-bottom:6px; letter-spacing:.1em; }
+  .stat-row { display:flex; justify-content:space-between; font-size:12px; }
+  .stat-label { color:var(--sand); }
+  .stat-val { color:var(--parch); font-family:'Share Tech Mono',monospace; }
+  .wind-compass { width:80px; height:80px; margin:0 auto; position:relative; }
+  .action-btn { font-family:'Cinzel',serif; font-size:11px; padding:8px; background:#0d1f35; border:1px solid var(--ui-border); color:var(--sand2); cursor:pointer; border-radius:3px; transition:all .2s; width:100%; text-align:center; }
+  .action-btn:hover { border-color:var(--gold); color:var(--gold); background:#152840; }
+  .wind-arrow { position:absolute; width:4px; background:var(--gold); transform-origin:bottom center; left:50%; margin-left:-2px; border-radius:2px 2px 0 0; }
+
+  /* ── BATTLE SCREEN ── */
+  #battleScreen { background:#0a1a30; }
+  #battleCanvas { border:2px solid var(--ui-border); }
+  .battle-hud { position:absolute; bottom:10px; left:50%; transform:translateX(-50%); display:flex; gap:12px; }
+  .battle-btn { font-family:'Cinzel',serif; font-size:13px; padding:10px 20px; background:#0d1f35; border:1px solid var(--ui-border); color:var(--sand2); cursor:pointer; border-radius:3px; transition:all .2s; }
+  .battle-btn:hover { border-color:var(--gold); color:var(--gold); }
+  .hp-bar-wrap { position:absolute; width:200px; height:16px; background:#0a1520; border:1px solid var(--ui-border); border-radius:3px; overflow:hidden; }
+  .hp-bar { height:100%; transition:width .3s; }
+  .ship-label { position:absolute; font-family:'Cinzel',serif; font-size:11px; color:var(--sand); }
+
+  /* ── DUEL SCREEN ── */
+  #duelScreen { background:radial-gradient(ellipse, #1a1008 0%, #0a0504 100%); }
+  #duelCanvas { border:2px solid var(--ui-border); }
+  .duel-hud { position:absolute; bottom:10px; left:50%; transform:translateX(-50%); display:flex; gap:10px; }
+  .duel-btn { font-family:'Cinzel',serif; font-size:14px; padding:12px 24px; background:#1a0808; border:2px solid var(--blood); color:var(--parch); cursor:pointer; border-radius:3px; transition:all .2s; }
+  .duel-btn:hover { background:#2a1010; border-color:var(--gold); }
+  .duel-btn:active { background:#3a1818; }
+
+  /* ── CITY SCREEN ── */
+  #cityScreen { background:radial-gradient(ellipse, #1a1a08 0%, #0a0a04 100%); }
+  .city-layout { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; max-width:700px; width:90%; }
+  .city-option { border:1px solid var(--ui-border); background:#0d1505; padding:20px; cursor:pointer; border-radius:4px; text-align:center; transition:all .2s; }
+  .city-option:hover { border-color:var(--gold); background:#1a2508; }
+  .city-icon { font-size:40px; margin-bottom:10px; }
+  .city-name-h { font-family:'Cinzel',serif; font-size:13px; color:var(--gold); }
+  .city-desc { font-size:11px; color:var(--sand); margin-top:4px; }
+  .city-title-h { font-family:'Cinzel',serif; font-size:28px; color:var(--gold2); margin-bottom:20px; }
+  .city-flag { font-size:30px; }
+
+  /* ── TAVERN ── */
+  #tavernScreen { background:radial-gradient(ellipse, #1a0e04 0%, #0a0704 100%); gap:16px; padding:20px; }
+
+  /* ── TREASURE / DIVVY ── */
+  #divvyScreen { background:#0a0a04; gap:12px; padding:20px; }
+
+  /* ── OVERLAY MESSAGES ── */
+  #overlay { position:fixed; inset:0; background:#000a; display:none; align-items:center; justify-content:center; z-index:100; }
+  #overlay.active { display:flex; }
+  .overlay-box { background:#0d1f35; border:2px solid var(--gold); padding:30px; max-width:420px; width:90%; border-radius:6px; text-align:center; }
+  .overlay-title { font-family:'Cinzel',serif; font-size:22px; color:var(--gold2); margin-bottom:10px; }
+  .overlay-text { color:var(--parch); font-size:15px; line-height:1.6; margin-bottom:16px; }
+  .overlay-btn { font-family:'Cinzel',serif; font-size:14px; padding:10px 28px; background:#8b1a1a; border:1px solid var(--gold); color:var(--gold2); cursor:pointer; border-radius:3px; margin:4px; }
+  .overlay-btn:hover { background:#c0392b; }
+  .overlay-btn.secondary { background:#0d1f35; }
+
+  /* ── STATUS BAR ── */
+  #statusBar { position:fixed; top:0; left:0; right:0; height:36px; background:#050f1a; border-bottom:1px solid var(--ui-border); display:flex; align-items:center; padding:0 12px; gap:16px; z-index:50; font-size:12px; font-family:'Share Tech Mono',monospace; }
+  .status-item { color:var(--sand); }
+  .status-val { color:var(--gold2); }
+  .status-sep { color:var(--ui-border); }
+
+  /* scrollbars */
+  ::-webkit-scrollbar { width:6px; }
+  ::-webkit-scrollbar-track { background:#050f1a; }
+  ::-webkit-scrollbar-thumb { background:var(--ui-border); border-radius:3px; }
+
+  /* ── RANK BADGE ── */
+  .rank-badge { font-family:'Cinzel',serif; font-size:11px; color:var(--blood); padding:2px 8px; border:1px solid var(--blood); border-radius:2px; }
+
+  /* waves animation */
+  @keyframes waveAnim { 0%{d:path("M0,60 C200,20 400,100 600,60 C800,20 1000,100 1200,60 L1200,200 L0,200 Z")} 50%{d:path("M0,80 C200,40 400,120 600,80 C800,40 1000,120 1200,80 L1200,200 L0,200 Z")} 100%{d:path("M0,60 C200,20 400,100 600,60 C800,20 1000,100 1200,60 L1200,200 L0,200 Z")} }
+</style>
+</head>
+<body>
+
+<!-- STATUS BAR -->
+<div id="statusBar" style="display:none;">
+  <span class="status-item">Kapitän: <span class="status-val" id="sbName">–</span></span>
+  <span class="status-sep">|</span>
+  <span class="status-item">Gold: <span class="status-val" id="sbGold">0</span></span>
+  <span class="status-sep">|</span>
+  <span class="status-item">Männer: <span class="status-val" id="sbCrew">0</span></span>
+  <span class="status-sep">|</span>
+  <span class="status-item">Schiffe: <span class="status-val" id="sbShips">1</span></span>
+  <span class="status-sep">|</span>
+  <span class="status-item">Jahr: <span class="status-val" id="sbYear">1660</span></span>
+  <span class="status-sep">|</span>
+  <span class="status-item">Ruf: <span class="status-val" id="sbRep">Unbekannt</span></span>
+</div>
+
+<!-- OVERLAY -->
+<div id="overlay">
+  <div class="overlay-box">
+    <div class="overlay-title" id="overlayTitle">Nachricht</div>
+    <div class="overlay-text" id="overlayText"></div>
+    <div id="overlayBtns"></div>
+  </div>
+</div>
+
+<!-- ══ TITLE SCREEN ══ -->
+<div id="titleScreen" class="screen active">
+  <div class="title-stars" id="starField"></div>
+  <svg class="title-waves" viewBox="0 0 1200 200" preserveAspectRatio="none">
+    <path fill="#1a3a5c88" d="M0,60 C200,20 400,100 600,60 C800,20 1000,100 1200,60 L1200,200 L0,200 Z"/>
+    <path fill="#0d2440aa" d="M0,90 C300,50 500,130 800,90 C1000,60 1100,110 1200,90 L1200,200 L0,200 Z"/>
+    <path fill="#0a1a2e" d="M0,120 C200,90 500,150 800,120 C1000,100 1100,140 1200,120 L1200,200 L0,200 Z"/>
+  </svg>
+  <div class="title-ship">⛵</div>
+  <h1 class="title-main">PIRATES!</h1>
+  <p class="title-sub">THE CARIBBEAN ADVENTURE</p>
+  <p class="title-author">Inspiriert von Sid Meier's Pirates! (MicroProse, 1987)</p>
+  <button class="btn-primary" onclick="showCharCreation()">⚓ Stich in See!</button>
+</div>
+
+<!-- ══ CHARACTER CREATION ══ -->
+<div id="charScreen" class="screen">
+  <h2 class="char-title">Erschaffe deinen Piraten</h2>
+
+  <!-- Step 1: Name -->
+  <div id="charStep1" style="display:flex;flex-direction:column;align-items:center;gap:12px;width:100%;">
+    <p class="step-label">SCHRITT 1 — DEIN NAME</p>
+    <input class="char-input" id="nameInput" type="text" placeholder="Kapitän …" maxlength="20"/>
+    <button class="btn-primary" onclick="charStep2()">Weiter →</button>
+  </div>
+
+  <!-- Step 2: Era -->
+  <div id="charStep2" style="display:none;flex-direction:column;align-items:center;gap:14px;width:100%;">
+    <p class="step-label">SCHRITT 2 — WÄHLE EINE ÄRA</p>
+    <div class="era-grid">
+      <div class="era-card" onclick="selectEra(this,'1560','Beutezüge der Spanier','Spanien dominiert — leichtes Plündern, wenig Konkurrenz')">
+        <h3>1560 — Beutezüge der Spanier</h3>
+        <p>Spanien beherrscht die Karibik. Reiche Galeonen, kaum Widerstand.</p>
+      </div>
+      <div class="era-card" onclick="selectEra(this,'1600','Die Piratenzeit','Ausgeglichene Kräfte — klassisches Erlebnis')">
+        <h3>1600 — Die Piratenzeit</h3>
+        <p>Vier Nationen kämpfen um die Vorherrschaft. Das goldene Zeitalter.</p>
+      </div>
+      <div class="era-card" onclick="selectEra(this,'1640','Zeitalter der Freibeuter','Starke Konkurrenz, reiche Beute, gefährliche Meere')">
+        <h3>1640 — Zeitalter der Freibeuter</h3>
+        <p>Die großen Piraten sind aktiv. Härterer Kampf, bessere Belohnungen.</p>
+      </div>
+      <div class="era-card" onclick="selectEra(this,'1660','Untergang der Piraten','Schwierigster Modus — die Nationen sind stark')">
+        <h3>1660 — Untergang der Piraten</h3>
+        <p>Das Ende der Piratenzeit. Nur die Besten überleben.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3: Nation -->
+  <div id="charStep3" style="display:none;flex-direction:column;align-items:center;gap:14px;width:100%;">
+    <p class="step-label">SCHRITT 3 — DEINE NATION</p>
+    <div class="nation-grid">
+      <div class="nation-btn" onclick="selectNation(this,'England','🏴󠁧󠁢󠁥󠁮󠁧󠁿','Gut zu Fuß, starke Marine')">
+        <span class="nation-flag">🏴󠁧󠁢󠁥󠁮󠁧󠁿</span>England
+      </div>
+      <div class="nation-btn" onclick="selectNation(this,'Spanien','🇪🇸','Reich, aber langsame Schiffe')">
+        <span class="nation-flag">🇪🇸</span>Spanien
+      </div>
+      <div class="nation-btn" onclick="selectNation(this,'Frankreich','🇫🇷','Schnelle Schiffe, Diplomatie')">
+        <span class="nation-flag">🇫🇷</span>Frankreich
+      </div>
+      <div class="nation-btn" onclick="selectNation(this,'Holland','🇳🇱','Reiche Händler, gute Kanonen')">
+        <span class="nation-flag">🇳🇱</span>Holland
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 4: Skill -->
+  <div id="charStep4" style="display:none;flex-direction:column;align-items:center;gap:14px;width:100%;">
+    <p class="step-label">SCHRITT 4 — DEINE BESONDERE FÄHIGKEIT</p>
+    <div class="skill-grid">
+      <div class="skill-btn" onclick="selectSkill(this,'Fechten','Schwertkämpfe werden einfacher. +30% Duell-Stärke')">
+        <h4>⚔️ Meisterfechter</h4>
+        <p>Du bist ein Virtuose der Klinge. Duelle gewinnst du mit Leichtigkeit.</p>
+      </div>
+      <div class="skill-btn" onclick="selectSkill(this,'Navigation','Bewege dich schneller auf der Karte. +20% Schiffsgeschwindigkeit')">
+        <h4>🧭 Navigation</h4>
+        <p>Du findest immer den günstigsten Wind und die schnellste Route.</p>
+      </div>
+      <div class="skill-btn" onclick="selectSkill(this,'Charme','Gouverneure mögen dich. Bessere Handelspreise und Belohnungen')">
+        <h4>💬 Charm & Witz</h4>
+        <p>Dein Wort ist Gold. Gouverneure empfangen dich mit offenen Armen.</p>
+      </div>
+      <div class="skill-btn" onclick="selectSkill(this,'Medizin','Deine Crew bleibt gesünder. Halbe Sterberate, bessere Moral')">
+        <h4>⚕️ Heilkunde</h4>
+        <p>Du kennst die Kräuter der Karibik. Deine Männer bleiben kampffähig.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ WORLD MAP ══ -->
+<div id="worldScreen" class="screen">
+  <canvas id="mapCanvas"></canvas>
+  <div id="mapPanel">
+    <div class="panel-title">⚓ DEIN SCHIFF</div>
+    <div class="stat-row"><span class="stat-label">Typ</span><span class="stat-val" id="pShipType">Sloop</span></div>
+    <div class="stat-row"><span class="stat-label">Kanonen</span><span class="stat-val" id="pCannons">8</span></div>
+    <div class="stat-row"><span class="stat-label">Laderaum</span><span class="stat-val" id="pCargo">0/50t</span></div>
+    <div class="stat-row"><span class="stat-label">Rumpf</span><span class="stat-val" id="pHull">100%</span></div>
+    <div class="stat-row"><span class="stat-label">Proviant</span><span class="stat-val" id="pFood">100d</span></div>
+
+    <div class="panel-title" style="margin-top:8px;">💨 WIND</div>
+    <canvas id="compassCanvas" width="80" height="80" style="display:block;margin:0 auto;"></canvas>
+    <div class="stat-row" style="margin-top:4px;"><span class="stat-label">Richtung</span><span class="stat-val" id="windDir">NNE</span></div>
+
+    <div class="panel-title" style="margin-top:8px;">🗺️ POSITION</div>
+    <div class="stat-row"><span class="stat-label">Region</span><span class="stat-val" id="pRegion">Offenes Meer</span></div>
+
+    <div class="panel-title" style="margin-top:8px;">⚡ AKTIONEN</div>
+    <button class="action-btn" onclick="tryDivvy()">💰 Beute aufteilen</button>
+    <button class="action-btn" onclick="tryRetire()">🏠 In Rente gehen</button>
+    <div style="font-size:10px;color:#4a6a8a;margin-top:4px;text-align:center;">Klicke auf Städte oder Schiffe</div>
+  </div>
+</div>
+
+<!-- ══ CITY SCREEN ══ -->
+<div id="cityScreen" class="screen">
+  <div style="text-align:center;margin-bottom:6px;">
+    <span class="city-flag" id="cityFlag">🏴󠁧󠁢󠁥󠁮󠁧󠁿</span>
+    <h2 class="city-title-h" id="cityNameH">Port Royal</h2>
+    <p style="color:var(--sand);font-size:13px;" id="cityNationH">Englische Kolonie</p>
+  </div>
+  <div class="city-layout">
+    <div class="city-option" onclick="showTavern()">
+      <div class="city-icon">🍺</div>
+      <div class="city-name-h">Taverne</div>
+      <div class="city-desc">Gerüchte hören, Männer anheuern, Informationen kaufen</div>
+    </div>
+    <div class="city-option" onclick="showShipyard()">
+      <div class="city-icon">⚓</div>
+      <div class="city-name-h">Werft</div>
+      <div class="city-desc">Schiff reparieren, Schiffe kaufen oder verkaufen</div>
+    </div>
+    <div class="city-option" onclick="showTrader()">
+      <div class="city-icon">🏪</div>
+      <div class="city-name-h">Händler</div>
+      <div class="city-desc">Waren kaufen und verkaufen, Proviant auffüllen</div>
+    </div>
+    <div class="city-option" onclick="showGovernor()">
+      <div class="city-icon">👑</div>
+      <div class="city-name-h">Gouverneur</div>
+      <div class="city-desc">Audienz, Kaperbrief, Belohnungen, Tochter treffen</div>
+    </div>
+    <div class="city-option" onclick="showChurch()">
+      <div class="city-icon">⛪</div>
+      <div class="city-name-h">Kirche</div>
+      <div class="city-desc">Heiraten, Buße tun, Informationen über Familie</div>
+    </div>
+    <div class="city-option" onclick="leaveCity()">
+      <div class="city-icon">⛵</div>
+      <div class="city-name-h">Ablegen</div>
+      <div class="city-desc">Kehre zurück zur Weltkarte</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TAVERN SCREEN ══ -->
+<div id="tavernScreen" class="screen">
+  <h2 style="font-family:Cinzel,serif;color:var(--gold2);font-size:26px;">🍺 Die Taverne</h2>
+  <div id="tavernContent" style="max-width:500px;width:90%;background:#0d1505;border:1px solid var(--ui-border);border-radius:6px;padding:20px;"></div>
+  <div style="display:flex;gap:12px;margin-top:16px;">
+    <button class="action-btn" style="width:140px;" onclick="tavernAction('rumor')">🗣️ Gerücht hören (20 Gold)</button>
+    <button class="action-btn" style="width:140px;" onclick="tavernAction('recruit')">👥 Rekrutieren (50 Gold)</button>
+    <button class="action-btn" style="width:140px;" onclick="showCity()">← Zurück</button>
+  </div>
+</div>
+
+<!-- ══ BATTLE SCREEN ══ -->
+<div id="battleScreen" class="screen">
+  <canvas id="battleCanvas"></canvas>
+  <div class="battle-hud">
+    <button class="battle-btn" onclick="battleAction('broadside')">💥 Breitseite</button>
+    <button class="battle-btn" onclick="battleAction('turn')">↩️ Wenden</button>
+    <button class="battle-btn" onclick="battleAction('board')">⚔️ Entern</button>
+    <button class="battle-btn" onclick="battleAction('flee')">🌬️ Fliehen</button>
+  </div>
+</div>
+
+<!-- ══ DUEL SCREEN ══ -->
+<div id="duelScreen" class="screen">
+  <canvas id="duelCanvas"></canvas>
+  <div class="duel-hud">
+    <button class="duel-btn" onclick="duelAction('high')">🗡️ Hoch</button>
+    <button class="duel-btn" onclick="duelAction('mid')">🗡️ Mitte</button>
+    <button class="duel-btn" onclick="duelAction('low')">🗡️ Tief</button>
+    <button class="duel-btn" onclick="duelAction('dodge')">💨 Ausweichen</button>
+  </div>
+</div>
+
+<!-- ══ DIVVY SCREEN ══ -->
+<div id="divvyScreen" class="screen">
+  <h2 style="font-family:Cinzel,serif;color:var(--gold2);font-size:28px;">💰 Beute aufteilen</h2>
+  <div id="divvyContent" style="max-width:500px;width:90%;background:#0d1505;border:1px solid var(--ui-border);border-radius:6px;padding:20px;text-align:center;"></div>
+  <button class="btn-primary" style="margin-top:16px;" onclick="finalizeDivvy()">Teilen & Weiter</button>
+</div>
+
+<!-- ══ RETIRE SCREEN ══ -->
+<div id="retireScreen" class="screen">
+  <h2 style="font-family:Cinzel,serif;color:var(--gold2);font-size:32px;">🏠 In den Ruhestand</h2>
+  <div id="retireContent" style="max-width:500px;width:90%;text-align:center;"></div>
+  <button class="btn-primary" style="margin-top:20px;" onclick="showTitle()">🔄 Neues Spiel</button>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+//  GAME STATE
+// ════════════════════════════════════════════════════════════
+const G = {
+  name:'', nation:'England', era:'1600', skill:'Fechten',
+  gold:500, crew:50, maxCrew:100,
+  ships:1, cannons:8, hull:100, cargo:0, maxCargo:50, food:100,
+  year:1600, month:0,
+  x:650, y:420,   // map position
+  speed:3,
+  windAngle:45, windSpeed:2,
+  plunder:0, score:0,
+  villainsCaptured:0,
+  reputation:'Unbekannt',
+  currentCity:null,
+  currentEnemy:null,
+  battlePhase:'approach',
+  playerShipX:0, playerShipY:0, playerShipAngle:0,
+  enemyShipX:0, enemyShipY:0, enemyShipAngle:0,
+  enemyHull:100, playerHull:100,
+  duelPlayerHP:100, duelEnemyHP:100,
+  duelCooldown:0,
+  selectedEra:null, selectedNation:null, selectedSkill:null,
+  charStep:1,
+  trophies:[],
+  map_moving:false,
+  map_dx:0, map_dy:0,
+  keys:{},
+  animFrame:null,
+  famousVillains:['El Diablo','Le Requin','Baron Razorwind','The Shadow','Dark Pete'],
+  villainsDefeated:[],
+};
+
+// ── CITIES ──
+const CITIES = [
+  {name:'Port Royal',       x:570, y:390, nation:'England', flag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿', size:'large', gold:1200, goods:['Rum','Zucker','Tabak']},
+  {name:'Havanna',          x:490, y:355, nation:'Spanien', flag:'🇪🇸', size:'large', gold:1500, goods:['Gold','Silber','Gewürze']},
+  {name:'Tortuga',          x:600, y:360, nation:'Piraten', flag:'💀', size:'medium', gold:600, goods:['Waffen','Rum','Munition']},
+  {name:'Cartagena',        x:490, y:470, nation:'Spanien', flag:'🇪🇸', size:'large', gold:1100, goods:['Perlen','Indigo','Cochenille']},
+  {name:'Martinique',       x:680, y:420, nation:'Frankreich', flag:'🇫🇷', size:'medium', gold:800, goods:['Zucker','Kaffee','Vanille']},
+  {name:'Curaçao',          x:550, y:460, nation:'Holland', flag:'🇳🇱', size:'medium', gold:900, goods:['Salz','Kupfer','Tabak']},
+  {name:'Nassau',           x:590, y:330, nation:'England', flag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿', size:'small', gold:400, goods:['Schildpatt','Ambergris','Rum']},
+  {name:'St. Augustine',    x:560, y:280, nation:'Spanien', flag:'🇪🇸', size:'small', gold:350, goods:['Pelze','Holz','Tabak']},
+  {name:'Port de Paix',     x:615, y:355, nation:'Frankreich', flag:'🇫🇷', size:'small', gold:400, goods:['Kakao','Indigo','Baumwolle']},
+  {name:'Maracaibo',        x:510, y:475, nation:'Spanien', flag:'🇪🇸', size:'medium', gold:700, goods:['Perlen','Tabak','Vieh']},
+  {name:'Trinidad',         x:630, y:480, nation:'England', flag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿', size:'small', gold:300, goods:['Kakao','Zucker','Asphalt']},
+  {name:'Barbados',         x:710, y:450, nation:'England', flag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿', size:'medium', gold:600, goods:['Zucker','Rum','Baumwolle']},
+];
+
+const SHIP_TYPES = ['Sloop','Brigantine','Fregatte','Galleon','Galeone'];
+const NATION_COLORS = {England:'#cc0000',Spanien:'#ffdd00',Frankreich:'#0055a4',Holland:'#ff6600',Piraten:'#333'};
+const RANKS = [
+  {min:0,name:'Unbekannt'},{min:500,name:'Schurke'},{min:2000,name:'Matrose'},
+  {min:5000,name:'Freibeuter'},{min:10000,name:'Pirat'},{min:20000,name:'Korsar'},
+  {min:40000,name:'Kapitän'},{min:70000,name:'Kommodore'},{min:100000,name:'Admiral'},
+  {min:150000,name:'Piratenkönig'}
+];
+
+// ════════════════════════════════════════════════════════════
+//  HELPERS
+// ════════════════════════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function showOverlay(title, text, btns) {
+  document.getElementById('overlayTitle').textContent = title;
+  document.getElementById('overlayText').innerHTML = text;
+  const bc = document.getElementById('overlayBtns');
+  bc.innerHTML='';
+  btns.forEach(b=>{
+    const el=document.createElement('button');
+    el.className='overlay-btn'+(b.secondary?' secondary':'');
+    el.textContent=b.label;
+    el.onclick=()=>{hideOverlay();b.action&&b.action();};
+    bc.appendChild(el);
+  });
+  document.getElementById('overlay').classList.add('active');
+}
+function hideOverlay(){document.getElementById('overlay').classList.remove('active');}
+function updateStatusBar(){
+  document.getElementById('sbName').textContent=G.name;
+  document.getElementById('sbGold').textContent=G.gold.toLocaleString();
+  document.getElementById('sbCrew').textContent=G.crew;
+  document.getElementById('sbShips').textContent=G.ships;
+  document.getElementById('sbYear').textContent=G.year;
+  // rank
+  let rank='Unbekannt';
+  for(const r of RANKS){if(G.score>=r.min)rank=r.name;}
+  G.reputation=rank;
+  document.getElementById('sbRep').textContent=rank;
+}
+function updateMapPanel(){
+  document.getElementById('pShipType').textContent=SHIP_TYPES[Math.min(G.ships-1,4)];
+  document.getElementById('pCannons').textContent=G.cannons;
+  document.getElementById('pCargo').textContent=`${G.cargo}/${G.maxCargo}t`;
+  document.getElementById('pHull').textContent=`${G.hull}%`;
+  document.getElementById('pFood').textContent=`${G.food}d`;
+  // find current region
+  let nearest=null,nearestD=9999;
+  for(const c of CITIES){
+    const d=Math.hypot(c.x-G.x,c.y-G.y);
+    if(d<nearestD){nearestD=d;nearest=c;}
+  }
+  document.getElementById('pRegion').textContent=nearestD<30?nearest.name:(nearestD<80?`Nähe von ${nearest.name}`:'Offenes Meer');
+  drawCompass();
+}
+
+// ════════════════════════════════════════════════════════════
+//  TITLE & CHAR CREATION
+// ════════════════════════════════════════════════════════════
+function showTitle(){
+  // reset
+  Object.assign(G,{gold:500,crew:50,ships:1,cannons:8,hull:100,cargo:0,food:100,year:1600,month:0,x:650,y:420,plunder:0,score:0,villainsDefeated:[],trophies:[]});
+  showScreen('titleScreen');
+  document.getElementById('statusBar').style.display='none';
+  initStars();
+}
+function initStars(){
+  const sf=document.getElementById('starField');
+  sf.innerHTML='';
+  for(let i=0;i<120;i++){
+    const s=document.createElement('div');
+    s.className='star';
+    const sz=Math.random()*2.5+0.5;
+    s.style.cssText=`width:${sz}px;height:${sz}px;top:${Math.random()*100}%;left:${Math.random()*100}%;animation-delay:${Math.random()*3}s;animation-duration:${1.5+Math.random()*2}s`;
+    sf.appendChild(s);
+  }
+}
+function showCharCreation(){
+  showScreen('charScreen');
+  showCharStep(1);
+}
+function showCharStep(n){
+  G.charStep=n;
+  [1,2,3,4].forEach(i=>{
+    const el=document.getElementById('charStep'+i);
+    if(el) el.style.display=(i===n)?'flex':'none';
+  });
+}
+function charStep2(){
+  G.name=document.getElementById('nameInput').value.trim()||'Kapitän Drake';
+  showCharStep(2);
+}
+function selectEra(el,year,name,desc){
+  document.querySelectorAll('.era-card').forEach(e=>e.classList.remove('selected'));
+  el.classList.add('selected');
+  G.era=year; G.year=parseInt(year);
+  setTimeout(()=>showCharStep(3),300);
+}
+function selectNation(el,nation,flag,desc){
+  document.querySelectorAll('.nation-btn').forEach(e=>e.classList.remove('selected'));
+  el.classList.add('selected');
+  G.nation=nation;
+  setTimeout(()=>showCharStep(4),300);
+}
+function selectSkill(el,skill,desc){
+  document.querySelectorAll('.skill-btn').forEach(e=>e.classList.remove('selected'));
+  el.classList.add('selected');
+  G.skill=skill;
+  // apply skill bonuses
+  if(skill==='Fechten') G.duelBonus=30;
+  if(skill==='Navigation'){G.speed=4;}
+  if(skill==='Charme'){G.charmeBonus=true;}
+  if(skill==='Medizin'){G.medBonus=true;}
+  setTimeout(()=>startGame(),500);
+}
+
+// ════════════════════════════════════════════════════════════
+//  GAME START
+// ════════════════════════════════════════════════════════════
+function startGame(){
+  document.getElementById('statusBar').style.display='flex';
+  updateStatusBar();
+  initWorldMap();
+  showScreen('worldScreen');
+  showOverlay(
+    `Ahoi, Kapitän ${G.name}!`,
+    `Das Jahr ist ${G.year}. Du stechst mit einer kleinen Sloop und ${G.crew} treuen Männern in See.<br><br>Die Karibik liegt vor dir — voller Reichtümer, Gefahren und Abenteuer. Dein erster Auftrag: Finde eine Stadt und stelle dich dem Gouverneur vor.<br><br><em>Klicke auf die Karte um zu navigieren. Städte und Schiffe kannst du anklicken.</em>`,
+    [{label:'Leinen los! ⚓', action:null}]
+  );
+}
+
+// ════════════════════════════════════════════════════════════
+//  WORLD MAP
+// ════════════════════════════════════════════════════════════
+let mapCtx, mapCanvas, mapW, mapH;
+let enemyShips=[];
+let mapAnimFrame;
+const MAP_SCALE=1.0;
+
+function initWorldMap(){
+  mapCanvas=document.getElementById('mapCanvas');
+  const panel=document.getElementById('mapPanel');
+  mapW=window.innerWidth-panel.offsetWidth;
+  mapH=window.innerHeight;
+  mapCanvas.width=mapW;
+  mapCanvas.height=mapH;
+  mapCtx=mapCanvas.getContext('2d');
+  if(G.x===650) { G.x=CITIES[0].x; G.y=CITIES[0].y; }
+  spawnEnemyShips();
+  mapCanvas.addEventListener('click',onMapClick);
+  document.addEventListener('keydown',e=>{G.keys[e.key]=true;});
+  document.addEventListener('keyup',e=>{G.keys[e.key]=false;});
+  if(mapAnimFrame) cancelAnimationFrame(mapAnimFrame);
+  mapLoop();
+}
+
+function spawnEnemyShips(){
+  enemyShips=[];
+  const nations=['Spanien','England','Frankreich','Holland','Piraten'];
+  for(let i=0;i<8;i++){
+    const n=nations[Math.floor(Math.random()*nations.length)];
+    enemyShips.push({
+      x:350+Math.random()*400, y:250+Math.random()*280,
+      angle:Math.random()*Math.PI*2, speed:1+Math.random(),
+      nation:n, cannons:4+Math.floor(Math.random()*16),
+      hull:100, name:randomShipName(n),
+      gold:200+Math.floor(Math.random()*800),
+      cargo:Math.floor(Math.random()*30),
+    });
+  }
+}
+function randomShipName(n){
+  const e=['HMS Revenge','HMS Terror','HMS Dragon','HMS Viper','HMS Swift'];
+  const s=['San Felipe','San Cristobal','Santa Maria','Nuestra Señora','La Paz'];
+  const f=['Le Requin','La Belle','Le Tonnerre','L\'Aigle','La Victoire'];
+  const h=['Wapen von Hamburg','De Ruyter','Prins Maurits','Zeehond','Vliegende Draeck'];
+  const p=['Black Death','Sea Serpent','Devil\'s Hand','Grim Reaper','Iron Will'];
+  const map={England:e,Spanien:s,Frankreich:f,Holland:h,Piraten:p};
+  const arr=map[n]||p;
+  return arr[Math.floor(Math.random()*arr.length)];
+}
+
+function mapLoop(){
+  if(document.getElementById('worldScreen').classList.contains('active')){
+    updateMap();
+    drawMap();
+    mapAnimFrame=requestAnimationFrame(mapLoop);
+  }
+}
+function updateMap(){
+  // keyboard movement
+  const spd = G.speed || 3;
+  if(G.keys['ArrowUp']||G.keys['w'])    G.y-=spd;
+  if(G.keys['ArrowDown']||G.keys['s'])  G.y+=spd;
+  if(G.keys['ArrowLeft']||G.keys['a'])  G.x-=spd;
+  if(G.keys['ArrowRight']||G.keys['d']) G.x+=spd;
+  G.x=Math.max(300,Math.min(800,G.x));
+  G.y=Math.max(200,Math.min(530,G.y));
+
+  // enemy movement
+  for(const e of enemyShips){
+    e.x+=Math.cos(e.angle)*e.speed*0.3;
+    e.y+=Math.sin(e.angle)*e.speed*0.3;
+    if(e.x<300||e.x>800||e.y<200||e.y>530) e.angle+=Math.PI;
+    if(Math.random()<0.005) e.angle+=( Math.random()-0.5)*0.5;
+    // encounter?
+    const d=Math.hypot(e.x-G.x,e.y-G.y);
+    if(d<18&&e.hull>0){
+      startBattle(e);
+      return;
+    }
+  }
+
+  // wind drift
+  G.windAngle+=( Math.random()-0.5)*0.5;
+
+  // time passage
+  G.month+=0.002;
+  if(G.month>=12){G.month=0;G.year++;}
+
+  // food consumption
+  if(Math.random()<0.0005){
+    G.food=Math.max(0,G.food-1);
+    if(G.food===0){
+      G.crew=Math.max(5,G.crew-Math.floor(Math.random()*5+1));
+    }
+  }
+  updateStatusBar();
+  updateMapPanel();
+}
+
+function drawMap(){
+  const c=mapCtx;
+  c.clearRect(0,0,mapW,mapH);
+
+  // ocean gradient
+  const grad=c.createRadialGradient(mapW/2,mapH/2,0,mapW/2,mapH/2,Math.max(mapW,mapH)/1.5);
+  grad.addColorStop(0,'#1e4a6e');grad.addColorStop(1,'#0a1a2e');
+  c.fillStyle=grad; c.fillRect(0,0,mapW,mapH);
+
+  // wave texture
+  c.strokeStyle='#ffffff08'; c.lineWidth=1;
+  for(let y=220;y<530;y+=18){
+    c.beginPath();
+    for(let x=300;x<800;x+=4){
+      const wy=y+Math.sin((x+Date.now()*0.03)*0.08)*4;
+      x===300?c.moveTo(x,wy):c.lineTo(x,wy);
+    }
+    c.stroke();
+  }
+
+  // land masses (Caribbean)
+  drawLand(c);
+
+  // grid
+  c.strokeStyle='#ffffff06'; c.lineWidth=0.5;
+  for(let x=300;x<800;x+=50){c.beginPath();c.moveTo(x,200);c.lineTo(x,530);c.stroke();}
+  for(let y=200;y<530;y+=50){c.beginPath();c.moveTo(300,y);c.lineTo(800,y);c.stroke();}
+
+  // cities
+  for(const city of CITIES){
+    const col=NATION_COLORS[city.nation]||'#888';
+    const d=Math.hypot(city.x-G.x,city.y-G.y);
+    const hovered=d<22;
+    // glow
+    if(hovered){ c.save(); const g=c.createRadialGradient(city.x,city.y,0,city.x,city.y,30); g.addColorStop(0,'#ffffff33'); g.addColorStop(1,'transparent'); c.fillStyle=g; c.fillRect(city.x-30,city.y-30,60,60); c.restore(); }
+    // icon
+    const sz=city.size==='large'?9:city.size==='medium'?7:5;
+    c.fillStyle=col; c.strokeStyle='#fff'; c.lineWidth=1.5;
+    c.beginPath(); c.rect(city.x-sz,city.y-sz,sz*2,sz*2); c.fill(); c.stroke();
+    // flag
+    c.save(); c.font=`${hovered?16:12}px serif`; c.textAlign='center';
+    c.fillText(city.flag,city.x,city.y-sz-4); c.restore();
+    // name
+    c.fillStyle='#fff'; c.font=`bold ${hovered?13:10}px Cinzel,serif`; c.textAlign='center';
+    c.fillText(city.name,city.x,city.y+sz+12);
+  }
+
+  // enemy ships
+  for(const e of enemyShips){
+    if(e.hull<=0) continue;
+    const col=NATION_COLORS[e.nation]||'#888';
+    c.save(); c.translate(e.x,e.y); c.rotate(e.angle);
+    c.fillStyle=col; c.strokeStyle='#fff'; c.lineWidth=1;
+    c.beginPath(); c.moveTo(10,0); c.lineTo(-8,6); c.lineTo(-5,0); c.lineTo(-8,-6); c.closePath();
+    c.fill(); c.stroke();
+    c.restore();
+    // ship name on hover
+    const d=Math.hypot(e.x-G.x,e.y-G.y);
+    if(d<40){
+      c.fillStyle='#ffffffcc'; c.font='10px Share Tech Mono,monospace'; c.textAlign='center';
+      c.fillText(e.name,e.x,e.y-14);
+    }
+  }
+
+  // player ship
+  const px=G.x, py=G.y;
+  c.save(); c.translate(px,py);
+  // glow
+  const pg=c.createRadialGradient(0,0,0,0,0,25);
+  pg.addColorStop(0,'#ffffff33'); pg.addColorStop(1,'transparent');
+  c.fillStyle=pg; c.fillRect(-25,-25,50,50);
+  // ship triangle
+  c.fillStyle='#f0c040'; c.strokeStyle='#fff'; c.lineWidth=2;
+  c.beginPath(); c.moveTo(14,0); c.lineTo(-10,8); c.lineTo(-6,0); c.lineTo(-10,-8); c.closePath();
+  c.fill(); c.stroke();
+  // sail
+  c.fillStyle='#ffffffcc'; c.beginPath(); c.ellipse(0,-3,3,8,0,0,Math.PI*2); c.fill();
+  c.restore();
+  // player label
+  c.fillStyle=NATION_COLORS[G.nation]||'#f0c040'; c.font='bold 11px Cinzel,serif'; c.textAlign='center';
+  c.fillText(`⚑ ${G.name}`,px,py-18);
+
+  // compass rose
+  drawCompassRose(c,mapW-60,mapH-60,45);
+}
+
+function drawLand(c){
+  c.fillStyle='#2d5a27';
+  // Cuba
+  c.beginPath(); c.ellipse(490,345,75,22,Math.PI*0.05,0,Math.PI*2); c.fill();
+  c.fillStyle='#3a6e32';
+  c.beginPath(); c.ellipse(490,345,65,18,Math.PI*0.05,0,Math.PI*2); c.fill();
+  // Hispaniola
+  c.fillStyle='#2d5a27';
+  c.beginPath(); c.ellipse(615,360,42,18,-0.1,0,Math.PI*2); c.fill();
+  // Jamaica
+  c.beginPath(); c.ellipse(570,390,20,10,0,0,Math.PI*2); c.fill();
+  // Puerto Rico
+  c.beginPath(); c.ellipse(660,370,16,9,0,0,Math.PI*2); c.fill();
+  // Lesser Antilles (chain)
+  for(let i=0;i<8;i++){
+    c.beginPath(); c.ellipse(680+i*10,420-i*2,6,4,Math.random()*0.5,0,Math.PI*2); c.fill();
+  }
+  // South America coast
+  c.fillStyle='#2d5a27';
+  c.beginPath(); c.moveTo(300,500); c.bezierCurveTo(400,490,500,485,700,490); c.lineTo(700,540); c.lineTo(300,540); c.closePath(); c.fill();
+  // Florida
+  c.beginPath(); c.moveTo(530,270); c.bezierCurveTo(545,280,550,300,545,320); c.bezierCurveTo(535,310,520,290,530,270); c.fill();
+  // Yucatan
+  c.beginPath(); c.ellipse(420,360,18,30,0,0,Math.PI*2); c.fill();
+  // add some detail
+  c.fillStyle='#4a8f3f';
+  c.beginPath(); c.ellipse(490,343,50,14,Math.PI*0.05,0,Math.PI*2); c.fill();
+}
+
+function drawCompassRose(c,x,y,r){
+  c.save(); c.translate(x,y);
+  c.strokeStyle='#d4a01766'; c.lineWidth=1;
+  c.beginPath(); c.arc(0,0,r,0,Math.PI*2); c.stroke();
+  const dirs=['N','E','S','W'];
+  const angles=[0,90,180,270];
+  c.font='10px Cinzel,serif'; c.textAlign='center';
+  for(let i=0;i<4;i++){
+    const a=angles[i]*Math.PI/180;
+    const dx=Math.sin(a)*(r-8), dy=-Math.cos(a)*(r-8);
+    c.fillStyle=i===0?'#ff4444':'#d4a017';
+    c.fillText(dirs[i],dx,dy+4);
+  }
+  // wind arrow
+  const wa=G.windAngle*Math.PI/180;
+  c.strokeStyle='#f0c04088'; c.lineWidth=2;
+  c.beginPath(); c.moveTo(0,0); c.lineTo(Math.sin(wa)*(r-15),-Math.cos(wa)*(r-15)); c.stroke();
+  c.restore();
+}
+
+function drawCompass(){
+  const cc=document.getElementById('compassCanvas');
+  if(!cc) return;
+  const c=cc.getContext('2d');
+  c.clearRect(0,0,80,80);
+  drawCompassRose(c,40,40,36);
+  const dirs=['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+  const idx=Math.round(G.windAngle/22.5)%16;
+  document.getElementById('windDir').textContent=dirs[(idx+16)%16];
+}
+
+function onMapClick(e){
+  const rect=mapCanvas.getBoundingClientRect();
+  const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+  // check cities
+  for(const city of CITIES){
+    if(Math.hypot(city.x-mx,city.y-my)<22){
+      // navigate there
+      G.x=city.x; G.y=city.y;
+      enterCity(city);
+      return;
+    }
+  }
+  // check enemy ships
+  for(const es of enemyShips){
+    if(es.hull>0&&Math.hypot(es.x-mx,es.y-my)<20){
+      startBattle(es);
+      return;
+    }
+  }
+  // click to move
+  G.x+=(mx-G.x)*0.1; G.y+=(my-G.y)*0.1;
+}
+
+// ════════════════════════════════════════════════════════════
+//  CITY
+// ════════════════════════════════════════════════════════════
+function enterCity(city){
+  G.currentCity=city;
+  document.getElementById('cityNameH').textContent=city.name;
+  document.getElementById('cityNationH').textContent=`${city.nation}ische Kolonie`;
+  document.getElementById('cityFlag').textContent=city.flag;
+  showScreen('cityScreen');
+}
+function showCity(){ if(G.currentCity) enterCity(G.currentCity); }
+function leaveCity(){ showScreen('worldScreen'); mapLoop(); }
+
+function showTavern(){
+  showScreen('tavernScreen');
+  const tc=document.getElementById('tavernContent');
+  const rumors=[
+    `Ein spanischer Silbertransport soll nächsten Monat von ${CITIES[1].name} auslaufen.`,
+    `Man munkelt, ein berühmter Pirat hält sich in der Gegend auf...`,
+    `Der Gouverneur von ${G.currentCity.name} sucht nach seiner entführten Tochter!`,
+    `Eine Schatzkarte soll für 300 Gold zu haben sein.`,
+    `Eine holländische Flottille wurde nahe Trinidad gesichtet.`,
+    `Die Männer sind unruhig – bald müssen sie bezahlt werden.`,
+  ];
+  tc.innerHTML=`<p style="font-style:italic;color:var(--sand);">Du betrittst die dunkle, verqualmte Taverne. Ein Mann winkt dich ans Tresen.</p>
+  <br><p style="color:var(--parch);">Der Wirt erzählt dir:</p>
+  <blockquote style="border-left:3px solid var(--gold);padding-left:12px;margin:12px 0;color:var(--sand2);font-style:italic;">"${rumors[Math.floor(Math.random()*rumors.length)]}"</blockquote>
+  <hr style="border-color:var(--ui-border);margin:12px 0;">
+  <div style="display:flex;justify-content:space-between;font-size:12px;">
+    <span style="color:var(--sand);">Verfügbare Rekruten:</span>
+    <span style="color:var(--gold);">${5+Math.floor(Math.random()*20)} Männer</span>
+  </div>`;
+}
+function tavernAction(type){
+  if(type==='rumor'){
+    if(G.gold<20){showOverlay('Kein Gold!','Du hast nicht genug Gold für ein Gerücht.',[{label:'Schade',action:null}]);return;}
+    G.gold-=20; updateStatusBar();
+    showOverlay('Gerücht gehört!',`Der Informant flüstert: <em>"${['Ein Schatz liegt begraben bei der alten Ruine im Osten...','Eine Galeone voller Silber läuft morgen aus...','Der Gouverneur zahlt 500 Gold für den Kopf von El Diablo...'][Math.floor(Math.random()*3)]}"</em>`,[{label:'Interessant!',action:null}]);
+  } else {
+    if(G.gold<50){showOverlay('Kein Gold!','50 Gold werden für die Rekrutierung benötigt.',[{label:'Schade',action:null}]);return;}
+    const n=5+Math.floor(Math.random()*15);
+    G.gold-=50; G.crew=Math.min(G.maxCrew,G.crew+n); updateStatusBar();
+    showOverlay('Neue Männer!',`${n} hartgesottene Kerle schließen sich deiner Crew an! Deine Mannschaft wächst auf ${G.crew} Mann.`,[{label:'Willkommen an Bord!',action:null}]);
+  }
+}
+
+function showShipyard(){
+  const repairCost=Math.floor((100-G.hull)*10);
+  showOverlay(
+    '⚓ Werft',
+    `<strong>Schiffsrumpf:</strong> ${G.hull}%<br>
+     <strong>Reparaturkosten:</strong> ${repairCost} Gold<br><br>
+     Dein Schiff ist eine <strong>${SHIP_TYPES[Math.min(G.ships-1,4)]}</strong> mit ${G.cannons} Kanonen.`,
+    [
+      {label:`🔧 Reparieren (${repairCost}G)`,action:()=>repairShip()},
+      {label:'Zurück',action:showCity,secondary:true}
+    ]
+  );
+}
+function repairShip(){
+  const cost=Math.floor((100-G.hull)*10);
+  if(G.gold<cost){showOverlay('Kein Gold!','Du kannst dir die Reparatur nicht leisten.',[{label:'Mist',action:null}]);return;}
+  G.gold-=cost; G.hull=100; updateStatusBar();
+  showOverlay('Repariert!','Dein Schiff ist wieder in bestem Zustand!',[{label:'Ausgezeichnet!',action:showCity}]);
+}
+
+function showTrader(){
+  const goods=G.currentCity.goods;
+  const prices=goods.map(g=>100+Math.floor(Math.random()*200));
+  let html=`<strong>Marktpreise in ${G.currentCity.name}:</strong><br><br>`;
+  goods.forEach((g,i)=>{ html+=`• ${g}: <span style="color:var(--gold)">${prices[i]} Gold/t</span><br>`; });
+  html+=`<br>Dein Gold: <span style="color:var(--gold2)">${G.gold}</span> | Laderaum: ${G.cargo}/${G.maxCargo}t`;
+  showOverlay('🏪 Händler',html,[
+    {label:'Waren kaufen (100G/10t)',action:()=>buyGoods()},
+    {label:'Waren verkaufen',action:()=>sellGoods()},
+    {label:'Zurück',action:showCity,secondary:true}
+  ]);
+}
+function buyGoods(){
+  if(G.gold<100||G.cargo>=G.maxCargo){showOverlay('Fehler','Kein Gold oder kein Laderaum!',[{label:'OK',action:null}]);return;}
+  G.gold-=100; G.cargo=Math.min(G.maxCargo,G.cargo+10); updateStatusBar();
+  showOverlay('Gekauft!','Du hast 10 Tonnen Waren geladen.',[{label:'Gut',action:showCity}]);
+}
+function sellGoods(){
+  if(G.cargo<=0){showOverlay('Nichts zu verkaufen!','Dein Laderaum ist leer.',[{label:'OK',action:null}]);return;}
+  const val=G.cargo*(80+Math.floor(Math.random()*120));
+  G.gold+=val; G.cargo=0; G.score+=val; updateStatusBar();
+  showOverlay('Verkauft!',`Du hast alle Waren für ${val} Gold verkauft!`,[{label:'Ausgezeichnet!',action:showCity}]);
+}
+
+function showGovernor(){
+  const city=G.currentCity;
+  const rel=city.nation===G.nation?'freundlich':'neutral';
+  const daughter=['Isabella','Maria','Elena','Catalina','Anne'][Math.floor(Math.random()*5)];
+  showOverlay(
+    `👑 Gouverneur von ${city.name}`,
+    `Der Gouverneur empfängt dich ${rel===G.nation?'herzlich':'höflich'}.<br><br>
+    "Kapitän ${G.name}, willkommen in ${city.name}! Ich habe von euren Taten gehört."<br><br>
+    Seine Tochter <em>${daughter}</em> beobachtet euch neugierig aus dem Hintergrund...`,
+    [
+      {label:'💌 Tochter umwerben',action:()=>courtDaughter(daughter)},
+      {label:'📜 Kaperbrief erbitten',action:()=>requestLetter()},
+      {label:'🎁 Belohnung einfordern',action:()=>claimReward()},
+      {label:'Zurück',action:showCity,secondary:true}
+    ]
+  );
+}
+function courtDaughter(name){
+  if(G.score<5000){showOverlay('Zurückgewiesen',`"${name} verdient einen Mann von Stand, Kapitän. Beweist euch erst noch!"<br><br><em>Erhöht euren Ruf um weiter zu machen.</em>`,[{label:'Jawohl!',action:null}]);return;}
+  showOverlay('💕 Liebesglück!',`${name} lächelt euch warm zu. "Kapitän ${G.name}... ich habe viel von Ihren Heldentaten gehört."<br><br>Es scheint, als würde eine besondere Freundschaft entstehen...`,[{label:'❤️ Wunderbar!',action:null}]);
+}
+function requestLetter(){
+  if(G.gold<500){showOverlay('Abgelehnt!','"Ihr müsst erst Euren Wert beweisen, Kapitän. Bringt mir 500 Gold als Zeichen des guten Willens."',[{label:'Verstanden',action:null}]);return;}
+  G.gold-=500; updateStatusBar();
+  showOverlay('📜 Kaperbrief!',`"Im Namen ${G.currentCity.nation}s geben wir Euch hiermit das Recht, feindliche Schiffe zu kapern und zu plündern!"<br><br>Ihr habt nun einen offiziellen Kaperbrief!`,[{label:'In des Königs Namen!',action:showCity}]);
+}
+function claimReward(){
+  if(G.plunder<500){showOverlay('Keine Belohnung','Ihr habt noch nicht genug getan, um eine Belohnung zu verdienen.',[{label:'OK',action:null}]);return;}
+  const r=Math.floor(G.plunder*0.1);
+  G.gold+=r; G.plunder=0; G.score+=r; updateStatusBar();
+  showOverlay('🎁 Belohnt!',`"Für eure tapferen Dienste für die Krone erhaltet Ihr ${r} Gold und unsere ewige Dankbarkeit!"<br><br>Dein Ruf steigt!`,[{label:'Vivat!',action:showCity}]);
+}
+
+function showChurch(){
+  showOverlay('⛪ Kirche',`Der Priester empfängt dich ruhig.<br><br>"Willkommen, Sohn. Suchst du Vergebung oder Erleuchtung?"<br><br>Du hörst von einer deiner verlorenen Familienmitglieder — sie sollen sich in der Umgebung aufhalten...`,[{label:'Dankeschön, Padre',action:showCity},{label:'Spende (100G)',action:()=>donateChurch()}]);
+}
+function donateChurch(){
+  if(G.gold<100){showOverlay('Kein Gold','Du hast nicht genug zum Spenden.',[{label:'OK',action:null}]);return;}
+  G.gold-=100; G.score+=200; updateStatusBar();
+  showOverlay('Gesegnet!','"Möge Gott euren Weg segnen, Kapitän. Eure Crew wird von eurem Edelmut erfahren."<br><br><em>+200 Ansehen. Moral der Crew steigt.</em>',[{label:'Amen',action:showCity}]);
+}
+
+// ════════════════════════════════════════════════════════════
+//  BATTLE
+// ════════════════════════════════════════════════════════════
+let battleCtx, battleCvs, battleAnim;
+
+function startBattle(enemy){
+  G.currentEnemy=enemy;
+  G.playerHull=G.hull;
+  G.enemyHull=100;
+  G.battlePhase='approach';
+
+  battleCvs=document.getElementById('battleCanvas');
+  const w=window.innerWidth, h=window.innerHeight-80;
+  battleCvs.width=w; battleCvs.height=h;
+  battleCtx=battleCvs.getContext('2d');
+
+  // init ship positions
+  G.playerShipX=150; G.playerShipY=h/2;
+  G.enemyShipX=w-150; G.enemyShipY=h/2;
+  G.playerShipAngle=0; G.enemyShipAngle=Math.PI;
+
+  showScreen('battleScreen');
+  if(battleAnim) cancelAnimationFrame(battleAnim);
+  battleLoop();
+
+  showOverlay(
+    `⚔️ Begegnung auf See!`,
+    `<strong>${enemy.name}</strong> (${enemy.nation}) — ${enemy.cannons} Kanonen<br><br>
+    Das feindliche Schiff nähert sich! Bereitet euch auf den Kampf vor!`,
+    [{label:'Zum Kampf!',action:hideOverlay}]
+  );
+}
+
+function battleLoop(){
+  if(!document.getElementById('battleScreen').classList.contains('active')) return;
+  drawBattle();
+  battleAnim=requestAnimationFrame(battleLoop);
+}
+
+function drawBattle(){
+  const c=battleCtx;
+  const w=battleCvs.width, h=battleCvs.height;
+  c.clearRect(0,0,w,h);
+
+  // sea
+  const g=c.createLinearGradient(0,0,0,h);
+  g.addColorStop(0,'#1a3a5c');g.addColorStop(1,'#0a1a2e');
+  c.fillStyle=g; c.fillRect(0,0,w,h);
+
+  // waves
+  const t=Date.now()*0.001;
+  c.strokeStyle='#ffffff18';c.lineWidth=1;
+  for(let y=0;y<h;y+=30){
+    c.beginPath();
+    for(let x=0;x<w;x+=4){ const wy=y+Math.sin((x*0.05)+t)*6; x===0?c.moveTo(x,wy):c.lineTo(x,wy); }
+    c.stroke();
+  }
+
+  // player ship
+  drawBattleShip(c,G.playerShipX,G.playerShipY,G.playerShipAngle,NATION_COLORS[G.nation]||'#f0c040',true);
+
+  // enemy ship
+  drawBattleShip(c,G.enemyShipX,G.enemyShipY,G.enemyShipAngle,NATION_COLORS[G.currentEnemy?.nation]||'#cc0000',false);
+
+  // HP bars
+  drawHPBar(c,60,h-40,200,G.playerHull,`${G.name}'s Schiff`,'#2ecc71');
+  drawHPBar(c,w-260,h-40,200,G.enemyHull,G.currentEnemy?.name||'Feind','#e74c3c');
+}
+
+function drawBattleShip(c,x,y,angle,col,isPlayer){
+  c.save(); c.translate(x,y); c.rotate(angle);
+  const size=isPlayer?1.4:1.2;
+  // hull
+  c.fillStyle=col; c.strokeStyle='#fff'; c.lineWidth=2;
+  c.beginPath(); c.moveTo(35*size,0); c.lineTo(-25*size,15*size); c.lineTo(-18*size,0); c.lineTo(-25*size,-15*size); c.closePath();
+  c.fill(); c.stroke();
+  // mast
+  c.strokeStyle='#8b6914'; c.lineWidth=3;
+  c.beginPath(); c.moveTo(5*size,-20*size); c.lineTo(5*size,0); c.stroke();
+  // sail
+  c.fillStyle='#ffffffcc';
+  c.beginPath(); c.moveTo(5*size,-18*size); c.bezierCurveTo(22*size,-10*size,22*size,10*size,5*size,2*size); c.closePath(); c.fill();
+  // cannons
+  c.fillStyle='#555'; c.strokeStyle='#333'; c.lineWidth=1;
+  for(let i=-1;i<=1;i+=2){ c.beginPath(); c.rect(-10*size,i*12*size,8*size,4*size); c.fill(); c.stroke(); }
+  c.restore();
+}
+
+function drawHPBar(c,x,y,w,hp,label,col){
+  c.fillStyle='#0a1520'; c.strokeStyle='#2a5a8c'; c.lineWidth=1;
+  c.fillRect(x,y,w,14); c.strokeRect(x,y,w,14);
+  c.fillStyle=col; c.fillRect(x+1,y+1,(w-2)*hp/100,12);
+  c.fillStyle='#fff'; c.font='10px Cinzel,serif'; c.textAlign='center';
+  c.fillText(`${label} — ${Math.round(hp)}%`,x+w/2,y-4);
+}
+
+function battleAction(action){
+  if(!G.currentEnemy||G.enemyHull<=0||G.playerHull<=0) return;
+  const e=G.currentEnemy;
+  let msg='';
+
+  if(action==='broadside'){
+    const dmg=Math.floor(Math.random()*G.cannons*3+10);
+    const edm=Math.floor(Math.random()*e.cannons*2+5);
+    G.enemyHull=Math.max(0,G.enemyHull-dmg);
+    G.playerHull=Math.max(0,G.playerHull-edm);
+    G.hull=G.playerHull;
+    msg=`💥 Breitseite! Du triffst für ${dmg} Schaden. Der Feind erwidert mit ${edm}.`;
+    if(G.enemyHull<=0){
+      cancelAnimationFrame(battleAnim);
+      const gold=e.gold+Math.floor(Math.random()*300);
+      G.gold+=gold; G.plunder+=gold; G.score+=gold;
+      G.cargo=Math.min(G.maxCargo,G.cargo+e.cargo);
+      e.hull=0; updateStatusBar();
+      showOverlay('🏆 Sieg!',`"${e.name}" ist gesunken!<br><br>Du erbeutest:<br>• ${gold} Gold<br>• ${e.cargo} Tonnen Waren<br><br>Deine Männer jubeln!`,[{label:'Heja!',action:()=>{showScreen('worldScreen');mapLoop();}}]);
+      return;
+    }
+    if(G.playerHull<=0){
+      cancelAnimationFrame(battleAnim);
+      G.hull=10; G.crew=Math.max(5,Math.floor(G.crew*0.6));
+      showOverlay('💀 Niederlage!',`Dein Schiff ist schwer beschädigt und du musst fliehen!<br><br>Dein Schiff zieht sich beschämt zurück. ${Math.floor(G.crew*0.4)} Männer gehen verloren.`,[{label:'Rückzug!',action:()=>{G.playerHull=30;showScreen('worldScreen');mapLoop();}}]);
+      return;
+    }
+  } else if(action==='turn'){
+    G.playerShipAngle+=Math.PI*0.25;
+    const edm=Math.floor(Math.random()*5);
+    G.playerHull=Math.max(0,G.playerHull-edm);
+    G.hull=G.playerHull;
+    msg=`↩️ Du wendest das Schiff in den Wind. Leichte Beschädigungen: ${edm}`;
+  } else if(action==='board'){
+    if(Math.abs(G.enemyShipX-G.playerShipX)>200){
+      msg='⛵ Noch zu weit entfernt zum Entern! Nähert euch zuerst.';
+    } else {
+      cancelAnimationFrame(battleAnim);
+      startDuel();
+      return;
+    }
+  } else if(action==='flee'){
+    cancelAnimationFrame(battleAnim);
+    G.x+=30; G.y-=20;
+    showScreen('worldScreen'); mapLoop();
+    showOverlay('Entkommen!',`Ihr entkieht der Gefahr und entkommt! Deine Männer sind erleichtert.`,[{label:'Puh!',action:null}]);
+    return;
+  }
+  showOverlay('⚔️ Kampf',`${msg}<br><br>Feind-Rumpf: ${Math.round(G.enemyHull)}% | Euer Rumpf: ${Math.round(G.playerHull)}%`,[{label:'Weiter kämpfen!',action:hideOverlay}]);
+}
+
+// ════════════════════════════════════════════════════════════
+//  DUEL
+// ════════════════════════════════════════════════════════════
+let duelCtx, duelCvs, duelAnim, duelState;
+
+function startDuel(){
+  G.duelPlayerHP=100;
+  G.duelEnemyHP=100;
+  G.duelCooldown=0;
+  duelState={phase:'fight',playerStance:'mid',enemyStance:'mid',lastResult:''};
+
+  duelCvs=document.getElementById('duelCanvas');
+  const w=Math.min(window.innerWidth-20,700);
+  const h=Math.min(window.innerHeight-100,400);
+  duelCvs.width=w; duelCvs.height=h;
+  duelCtx=duelCvs.getContext('2d');
+
+  showScreen('duelScreen');
+  if(duelAnim) cancelAnimationFrame(duelAnim);
+  duelLoop();
+
+  showOverlay('⚔️ Entermannschaft!',`Deine Männer schwingen sich an Bord!<br><br>Du triffst den Kapitän von "${G.currentEnemy.name}" — ein wütender Blick, dann zieht er seinen Degen!<br><br><strong>Klinge gegen Klinge!</strong>`,[{label:'En Garde!',action:hideOverlay}]);
+}
+
+function duelLoop(){
+  if(!document.getElementById('duelScreen').classList.contains('active')) return;
+  drawDuel();
+  duelAnim=requestAnimationFrame(duelLoop);
+}
+
+function drawDuel(){
+  const c=duelCtx, w=duelCvs.width, h=duelCvs.height;
+  c.clearRect(0,0,w,h);
+
+  // background
+  const g=c.createRadialGradient(w/2,h/2,0,w/2,h/2,w);
+  g.addColorStop(0,'#1a1008');g.addColorStop(1,'#0a0504');
+  c.fillStyle=g; c.fillRect(0,0,w,h);
+
+  // ship deck
+  c.fillStyle='#5a3a1a'; c.fillRect(0,h*0.7,w,h*0.3);
+  c.fillStyle='#4a2a0a'; c.fillRect(0,h*0.68,w,4);
+  // planks
+  c.strokeStyle='#3a1a0866'; c.lineWidth=1;
+  for(let x=0;x<w;x+=40){ c.beginPath(); c.moveTo(x,h*0.7); c.lineTo(x,h); c.stroke(); }
+
+  // draw fencers
+  drawFencer(c,w/4,h*0.68,'player',duelState.playerStance,G.duelPlayerHP);
+  drawFencer(c,3*w/4,h*0.68,'enemy',duelState.enemyStance,G.duelEnemyHP);
+
+  // HP bars
+  drawDuelHP(c,20,20,200,G.duelPlayerHP,G.name,'#2ecc71');
+  drawDuelHP(c,w-220,20,200,G.duelEnemyHP,G.currentEnemy?.name?.split(' ')[0]||'Feind','#e74c3c');
+
+  // result text
+  if(duelState.lastResult){
+    c.fillStyle='#f0c040dd'; c.font='bold 16px Cinzel,serif'; c.textAlign='center';
+    c.fillText(duelState.lastResult,w/2,h/2-20);
+  }
+}
+
+function drawFencer(c,x,y,type,stance,hp){
+  const flip=type==='enemy'?-1:1;
+  c.save(); c.translate(x,y);
+  // body
+  const bodyColor=type==='player'?'#4a6a9a':'#9a4a4a';
+  c.fillStyle=bodyColor;
+  // legs
+  c.beginPath(); c.rect(-8*flip,-50,6,50); c.rect(4*flip,-50,6,50); c.fill();
+  // torso
+  c.beginPath(); c.rect(-12*flip,-90,24,40); c.fill();
+  // head
+  c.fillStyle='#c8a070';
+  c.beginPath(); c.arc(0,-100,14,0,Math.PI*2); c.fill();
+  // hat
+  c.fillStyle='#1a1a1a';
+  c.beginPath(); c.rect(-16,-116,32,8); c.rect(-10,-136,20,24); c.fill();
+  // sword arm
+  c.strokeStyle='#c0c0c0'; c.lineWidth=3;
+  let sx=40*flip, sy=-70;
+  if(stance==='high'){sy=-90;}
+  if(stance==='low'){sy=-50;}
+  c.beginPath(); c.moveTo(10*flip,-70); c.lineTo(sx,sy); c.stroke();
+  // sword blade
+  c.strokeStyle='#e0e0e0'; c.lineWidth=2;
+  c.beginPath(); c.moveTo(sx,sy); c.lineTo(sx+30*flip,sy-10); c.stroke();
+  // health indication
+  if(hp<30){ c.strokeStyle='#ff444488'; c.lineWidth=8; c.beginPath(); c.arc(0,-80,30,0,Math.PI*2); c.stroke(); }
+  c.restore();
+}
+
+function drawDuelHP(c,x,y,w,hp,name,col){
+  c.fillStyle='#0a0804'; c.fillRect(x,y,w,16);
+  c.fillStyle=col; c.fillRect(x,y,w*hp/100,16);
+  c.strokeStyle='#d4a01766'; c.lineWidth=1; c.strokeRect(x,y,w,16);
+  c.fillStyle='#fff'; c.font='11px Cinzel,serif'; c.textAlign='center';
+  c.fillText(`${name}: ${Math.round(hp)}%`,x+w/2,y+12);
+}
+
+function duelAction(move){
+  if(G.duelPlayerHP<=0||G.duelEnemyHP<=0) return;
+  duelState.playerStance=move;
+
+  // enemy AI
+  const moves=['high','mid','low','dodge'];
+  const enemyMove=moves[Math.floor(Math.random()*4)];
+  duelState.enemyStance=enemyMove;
+
+  // resolve
+  const skillBonus=(G.skill==='Fechten')?0.3:0;
+  let pDmg=0, eDmg=0, result='';
+
+  const matrix={
+    high:{high:[5,5],mid:[15,0],low:[0,15],dodge:[5,0]},
+    mid:{high:[0,10],mid:[8,8],low:[12,0],dodge:[5,0]},
+    low:{high:[15,0],mid:[0,12],low:[5,5],dodge:[5,0]},
+    dodge:{high:[0,5],mid:[0,5],low:[0,5],dodge:[0,0]}
+  };
+  const [pd,ed]=matrix[move]?.[enemyMove]||[5,5];
+  pDmg=Math.floor(ed*(1-skillBonus))+Math.floor(Math.random()*5);
+  eDmg=Math.floor(pd*(1+skillBonus))+Math.floor(Math.random()*8);
+
+  G.duelPlayerHP=Math.max(0,G.duelPlayerHP-pDmg);
+  G.duelEnemyHP=Math.max(0,G.duelEnemyHP-eDmg);
+
+  if(eDmg>pd){ result=`Treffer! +${eDmg} Schaden`; }
+  else if(pDmg>0){ result=`Au! Du nimmst ${pDmg} Schaden`; }
+  else { result='Kein Treffer!'; }
+  duelState.lastResult=result;
+  setTimeout(()=>{duelState.lastResult='';},800);
+
+  if(G.duelEnemyHP<=0){
+    cancelAnimationFrame(duelAnim);
+    const e=G.currentEnemy;
+    const prize=e.gold+Math.floor(G.score*0.05);
+    G.gold+=prize; G.plunder+=prize; G.score+=prize+500;
+    G.ships=Math.min(5,G.ships+1);
+    G.cannons+=e.cannons; G.maxCargo+=e.cargo||10;
+    e.hull=0; updateStatusBar();
+    showOverlay('⚔️ Glanzvoll gesiegt!',`Der feindliche Kapitän wirft seine Klinge nieder und ergibt sich!<br><br>"${e.name}" ist jetzt unter deinem Kommando!<br><br>Beute:<br>• ${prize} Gold<br>• 1 neues Schiff<br>• ${e.cannons} neue Kanonen`,[{label:'Für die Freiheit!',action:()=>{showScreen('worldScreen');mapLoop();}}]);
+    return;
+  }
+  if(G.duelPlayerHP<=0){
+    cancelAnimationFrame(duelAnim);
+    G.gold=Math.floor(G.gold*0.5); G.crew=Math.max(5,Math.floor(G.crew*0.7));
+    G.hull=Math.max(10,G.hull-20); updateStatusBar();
+    showOverlay('💀 Niederlage!',`Du verlierst den Kampf und wirst geschlagen! Der feindliche Kapitän lacht dich aus.<br><br>Du verlierst die Hälfte deines Goldes und einige Männer...`,[{label:'Zum Teufel!',action:()=>{showScreen('worldScreen');mapLoop();}}]);
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  DIVVY & RETIRE
+// ════════════════════════════════════════════════════════════
+function tryDivvy(){
+  if(G.plunder===0){
+    showOverlay('Keine Beute','Ihr habt noch nichts zum Aufteilen. Beutet erst feindliche Schiffe oder Städte!',[{label:'Verstanden',action:null}]);
+    return;
+  }
+  const dc=document.getElementById('divvyContent');
+  const crewShare=Math.floor(G.plunder*0.4);
+  const captainShare=G.plunder-crewShare;
+  dc.innerHTML=`
+    <h3 style="font-family:Cinzel,serif;color:var(--gold);margin-bottom:12px;">Aufstellung der Beute</h3>
+    <div style="font-size:14px;line-height:2;">
+      <div class="stat-row"><span class="stat-label">Gesamtbeute:</span><span class="stat-val">${G.plunder} Gold</span></div>
+      <div class="stat-row"><span class="stat-label">Mannschaftsanteil (40%):</span><span class="stat-val">${crewShare} Gold</span></div>
+      <div class="stat-row"><span class="stat-label">Dein Anteil (60%):</span><span class="stat-val" style="color:var(--gold2)">${captainShare} Gold</span></div>
+    </div>
+    <hr style="border-color:var(--ui-border);margin:12px 0;">
+    <p style="font-style:italic;color:var(--sand);font-size:13px;">"Share and share alike!" — Die ehrliche Piratenregel.</p>
+    <div style="margin-top:10px;font-size:12px;color:var(--sand);">Crew-Moral nach Auszahlung: <span style="color:var(--gold2)">Ausgezeichnet</span></div>
+  `;
+  showScreen('divvyScreen');
+}
+function finalizeDivvy(){
+  G.plunder=0;
+  showScreen('worldScreen'); mapLoop();
+  showOverlay('💰 Aufgeteilt!','Die Crew ist zufrieden! Eure Moral ist auf dem Höhepunkt. Die Männer singen und feiern.',[{label:'Hip Hip Hurra!',action:null}]);
+}
+
+function tryRetire(){
+  showRetireScreen();
+}
+function showRetireScreen(){
+  const rc=document.getElementById('retireContent');
+  let rank='Unbekannt';
+  for(const r of RANKS){if(G.score>=r.min)rank=r.name;}
+  const estates=['ein bescheidenes Haus','ein Landgut','eine Plantage','ein Herrenhaus','einen Palast'];
+  const estateIdx=Math.min(4,Math.floor(G.score/30000));
+  rc.innerHTML=`
+    <div style="font-size:60px;margin-bottom:16px;">🏡</div>
+    <p style="font-family:Cinzel,serif;font-size:22px;color:var(--gold2);">Kapitän ${G.name}</p>
+    <p style="color:var(--sand);margin:8px 0;">tritt ab als <strong style="color:var(--gold)">${rank}</strong></p>
+    <hr style="border-color:var(--ui-border);margin:16px auto;max-width:300px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:360px;margin:0 auto;font-size:14px;">
+      <div class="stat-row"><span class="stat-label">Gesamtvermögen:</span></div>
+      <div class="stat-val" style="text-align:right">${G.gold} Gold</div>
+      <div class="stat-row"><span class="stat-label">Ruf-Punkte:</span></div>
+      <div class="stat-val" style="text-align:right">${G.score}</div>
+      <div class="stat-row"><span class="stat-label">Jahre auf See:</span></div>
+      <div class="stat-val" style="text-align:right">${G.year-parseInt(G.era)}</div>
+      <div class="stat-row"><span class="stat-label">Schiffe erbeutet:</span></div>
+      <div class="stat-val" style="text-align:right">${G.ships-1}</div>
+    </div>
+    <hr style="border-color:var(--ui-border);margin:16px auto;max-width:300px;">
+    <p style="color:var(--parch);font-style:italic;font-size:14px;">Du ziehst dich zurück auf ${estates[estateIdx]} in der Karibik und genießt deinen verdienten Ruhestand.</p>
+    <div style="margin-top:16px;font-size:28px;">${G.score>50000?'⭐⭐⭐':G.score>20000?'⭐⭐':'⭐'}</div>
+    <p style="color:var(--sand);font-size:12px;margin-top:4px;">${G.score>50000?'Legendärer Pirat':G.score>20000?'Berühmter Freibeuter':'Mutiger Seefahrer'}</p>
+  `;
+  showScreen('retireScreen');
+}
+
+// ════════════════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════════════════
+window.onload=()=>{
+  initStars();
+  window.addEventListener('resize',()=>{
+    if(document.getElementById('worldScreen').classList.contains('active')){
+      initWorldMap();
+    }
+  });
+};
+</script>
+</body>
+</html>
